@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { DEFAULT_INITIAL_STATE } from "@/lib/types";
-import type { PipelineStatus, AgentState } from "@/lib/types";
+import type { PipelineStatus } from "@/lib/types";
 
 describe("AgentState types", () => {
   it("DEFAULT_INITIAL_STATE has status IDLE", () => {

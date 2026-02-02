@@ -70,10 +70,11 @@ describe("ValidationResultsCard", () => {
       <ValidationResultsCard totalRows={100} validCount={90} errorCount={10} />
     );
     // The progress bar should have a width style
-    const bar =
+    const progressBar =
       container.querySelector("[data-testid='progress-bar']") ||
       container.querySelector(".bg-green-500, .bg-emerald-500");
-    // At minimum, the component renders without error
+    // At minimum, the component renders without error; progressBar may or may not exist
+    void progressBar;
     expect(container.innerHTML).toContain("90");
   });
 });
