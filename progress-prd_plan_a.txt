@@ -9,9 +9,11 @@
 ## Completed Stories
 - 1.1: Project scaffold with pyproject.toml and directory structure
 - 1.2: PipelineState Pydantic model with aligned status values
+- 1.3: Agent callbacks: state initialization and prompt injection
 
 ## Current Phase
-Phase 1 - Project Scaffold & Models (IN PROGRESS)
+Phase 1 - Project Scaffold & Models (COMPLETE)
+Phase 2 - Tools (NEXT)
 
 ## Learnings & Patterns
 (To be updated as implementation progresses)
@@ -76,3 +78,26 @@ Phase 1 - Project Scaffold & Models (IN PROGRESS)
 **Learnings:**
 - ruff format adjusts blank line spacing — run `ruff format` before committing to avoid format check failures
 - PipelineState uses `list[dict]` and `dict[str, str]` for mutable defaults — Pydantic handles default factory automatically
+
+### Story 1.3: Agent callbacks: state initialization and prompt injection
+**Completed:** 2026-02-01
+**Phase:** 1 - Project Scaffold & Models
+
+**What Was Done:**
+- Created app/callbacks.py with three callback functions
+- on_before_agent: idempotent state initialization, fills missing keys with PipelineState defaults using fresh copies for mutable values
+- before_model_modifier: injects pipeline state summary into root agent's system instruction only (SpreadsheetValidatorAgent)
+- after_model_modifier: no-op that returns None, logs for debugging
+- Created tests/agents/test_callbacks.py with 7 tests across 3 test classes
+- Created tests/agents/__init__.py
+
+**Verification:**
+- pytest tests/agents/test_callbacks.py -v: PASS (7 passed)
+- pytest tests/ -v: PASS (35 passed, all stories)
+- ruff check . && ruff format --check .: PASS
+- All acceptance criteria: Satisfied
+
+**Learnings:**
+- Using lambdas for mutable defaults in _STATE_DEFAULTS dict ensures fresh copies on each call
+- PropertyMock on type() is needed to mock agent_name as a property on MagicMock
+- Phase 1 is now complete — all 3 foundation stories done

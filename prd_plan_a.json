@@ -83,7 +83,7 @@
         "1.2"
       ],
       "spec": "validator-agent/docs/phases/phase-01-scaffold-models.md#story-1.3",
-      "passes": false,
+      "passes": true,
       "description": "Create app/callbacks.py with three functions. (1) on_before_agent(callback_context): Idempotent state initialization \u2014 for each key in _STATE_DEFAULTS, set value if not present. Use fresh copies for mutable defaults. Log initialized fields. (2) before_model_modifier(callback_context, llm_request): Only modifies root agent. Builds a text summary of current state (status, file_name, row count, column list, error count, pending fixes, artifacts, as_of, usd_rounding). Prepends to system instruction. No A2UI hints. (3) after_model_modifier(callback_context, llm_response): Logs response type for debugging. Does not modify response.",
       "acceptanceCriteria": [
         "on_before_agent initializes all state fields when state is empty",
