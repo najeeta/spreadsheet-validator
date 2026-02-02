@@ -15,12 +15,14 @@
 - 2.3: Processing tools: transform_data, package_results
 - 3.1: Sub-agents: IngestionAgent, ValidationAgent, ProcessingAgent
 - 3.2: Root agent: SpreadsheetValidatorAgent orchestrator
+- 4.1: FastAPI server with AG-UI SSE endpoint and REST endpoints
 
 ## Current Phase
 Phase 1 - Project Scaffold & Models (COMPLETE)
 Phase 2 - Tools (COMPLETE)
 Phase 3 - Agent Core (COMPLETE)
-Phase 4 - Backend Server (IN PROGRESS)
+Phase 4 - Backend Server (COMPLETE)
+Phase 5 - Frontend Webapp (IN PROGRESS)
 
 ## Learnings & Patterns
 (To be updated as implementation progresses)
@@ -221,3 +223,30 @@ Phase 4 - Backend Server (IN PROGRESS)
 - The spec uses `from google.adk import App` but the installed version requires `from google.adk.apps import App` — `google.adk` re-exports `Agent` but not `App`
 - Agent constructor uses pydantic kwargs, so all fields (sub_agents, before_agent_callback, etc.) are passed directly
 - Phase 3 is now complete — both agent core stories done (sub-agents + root orchestrator)
+
+### Story 4.1: FastAPI server with AG-UI SSE endpoint and REST endpoints
+**Completed:** 2026-02-01
+**Phase:** 4 - Backend Server
+
+**What Was Done:**
+- Created app/server.py with FastAPI server, CORS middleware, and all REST endpoints
+- AG-UI SSE endpoint at /agent via ADKAgent.from_app() and add_adk_fastapi_endpoint()
+- REST endpoints: GET /health, POST /run, POST /upload, GET /runs, GET /runs/{id}, GET /artifacts/{name}, POST /feedback
+- InMemorySessionService and InMemoryArtifactService for development
+- Session tracking via _thread_to_session and _sessions dicts
+- Heavy keys (dataframe_records, dataframe_columns, validation_errors, pending_fixes) stripped from /runs listing
+- Created tests/e2e/__init__.py and tests/e2e/test_server.py with 13 tests across 8 test classes
+- Created tests/server/__init__.py for future server tests
+- No monkey-patches, no render_a2ui anywhere in server.py
+
+**Verification:**
+- pytest tests/e2e/test_server.py -v: PASS (13 passed)
+- pytest tests/ -v: PASS (125 passed, all stories including previous)
+- ruff check . && ruff format --check .: PASS
+- All acceptance criteria: Satisfied
+
+**Learnings:**
+- The spec used `Part.from_data()` but the correct API is `Part.from_bytes(data=..., mime_type=...)` — consistent with story 2.3 learning
+- add_adk_fastapi_endpoint() parameter order is (app, agent, path) not (app, path, agent) — must check function signatures
+- ADKAgent.from_app() accepts the App object as first positional arg, with session_service and artifact_service as kwargs
+- Phase 4 is now complete — single story for backend server done

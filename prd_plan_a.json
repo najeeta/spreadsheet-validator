@@ -244,7 +244,7 @@
         "3.2"
       ],
       "spec": "validator-agent/docs/phases/phase-04-backend-server.md#story-4.1",
-      "passes": false,
+      "passes": true,
       "description": "Create app/server.py. Initialize shared InMemorySessionService and InMemoryArtifactService. Create ADKAgent.from_app() wrapping the adk_app with emit_messages_snapshot=True. Mount AG-UI SSE endpoint at /agent via add_adk_fastapi_endpoint(). Add CORS middleware (allow all origins). REST endpoints: GET /health (returns status healthy), POST /run?thread_id (pre-creates session with _ag_ui_thread_id in state), POST /upload (file upload, saves as ADK artifact, updates session state with uploaded_file), GET /runs (list sessions with lightweight state \u2014 strip heavy keys), GET /runs/{session_id} (full session state), GET /artifacts/{name} (download artifact), POST /feedback (log user feedback). No imports of any monkey-patch modules. No render_a2ui tool anywhere.",
       "acceptanceCriteria": [
         "GET /health returns {'status': 'healthy'}",
