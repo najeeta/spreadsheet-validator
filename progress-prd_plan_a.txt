@@ -13,11 +13,14 @@
 - 2.1: Ingestion tools: request_file_upload, ingest_file, ingest_uploaded_file
 - 2.2: Validation tools: validate_data, request_user_fix, write_fix
 - 2.3: Processing tools: transform_data, package_results
+- 3.1: Sub-agents: IngestionAgent, ValidationAgent, ProcessingAgent
+- 3.2: Root agent: SpreadsheetValidatorAgent orchestrator
 
 ## Current Phase
 Phase 1 - Project Scaffold & Models (COMPLETE)
 Phase 2 - Tools (COMPLETE)
-Phase 3 - Agent Core (IN PROGRESS)
+Phase 3 - Agent Core (COMPLETE)
+Phase 4 - Backend Server (IN PROGRESS)
 
 ## Learnings & Patterns
 (To be updated as implementation progresses)
@@ -197,3 +200,24 @@ Phase 3 - Agent Core (IN PROGRESS)
 - The spec uses `from google.adk import LlmAgent` but the installed version requires `from google.adk.agents import LlmAgent` — google.adk only exports `Agent` at top level
 - LlmAgent constructor accepts kwargs via pydantic model (name, model, instruction, tools, output_key) — works as expected
 - Tool functions passed directly to LlmAgent.tools retain their __name__ attribute, making test assertions straightforward
+
+### Story 3.2: Root agent — SpreadsheetValidatorAgent orchestrator
+**Completed:** 2026-02-01
+**Phase:** 3 - Agent Core
+
+**What Was Done:**
+- Created app/agents/root_agent.py with SpreadsheetValidatorAgent (Agent, 3 sub-agents, no tools, 3 callbacks)
+- Created app/agent.py with ADK App wrapper (name='spreadsheet_validator')
+- Updated app/__init__.py to export root_agent for ADK discovery
+- Created tests/agents/test_root_agent.py with 14 tests across 5 test classes
+
+**Verification:**
+- pytest tests/agents/test_root_agent.py -v: PASS (14 passed)
+- pytest tests/ -v: PASS (112 passed, all stories including previous)
+- ruff check . && ruff format --check .: PASS
+- All acceptance criteria: Satisfied
+
+**Learnings:**
+- The spec uses `from google.adk import App` but the installed version requires `from google.adk.apps import App` — `google.adk` re-exports `Agent` but not `App`
+- Agent constructor uses pydantic kwargs, so all fields (sub_agents, before_agent_callback, etc.) are passed directly
+- Phase 3 is now complete — both agent core stories done (sub-agents + root orchestrator)
