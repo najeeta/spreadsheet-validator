@@ -1,0 +1,49 @@
+[project]
+name = "spreadsheet-validator"
+version = "0.1.0"
+description = "Spreadsheet Validator Agent — AG-UI State-Driven React Cards"
+requires-python = ">=3.11"
+dependencies = [
+    "google-adk>=1.15.0",
+    "fastapi>=0.100.0",
+    "uvicorn>=0.20.0",
+    "pandas>=2.0.0",
+    "openpyxl>=3.1.0",
+    "pydantic>=2.0.0",
+    "python-dotenv>=1.0.0",
+    "ag-ui-protocol>=0.1.10",
+    "ag-ui-adk>=0.4.2",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-cov>=4.0.0",
+    "httpx>=0.24.0",
+    "ruff>=0.4.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-cov>=4.0.0",
+    "httpx>=0.24.0",
+    "ruff>=0.4.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
