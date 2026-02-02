@@ -165,7 +165,7 @@
         "1.2"
       ],
       "spec": "validator-agent/docs/phases/phase-02-tools.md#story-2.3",
-      "passes": false,
+      "passes": true,
       "description": "Create app/tools/processing.py. (1) transform_data(tool_context, new_column_name, default_value=None, expression=None) \u2014 adds computed column to all records. Supports static default_value or Python expression evaluated with {'row': row} context. Updates dataframe_records and dataframe_columns. (2) async package_results(tool_context) \u2014 separates records into valid/invalid by validation_errors indices. Creates success.xlsx (valid rows) and errors.xlsx (invalid rows + _errors column). Saves both via tool_context.save_artifact(). Sets state['artifacts'] and status='COMPLETED'.",
       "acceptanceCriteria": [
         "transform_data adds a static column to all records",
