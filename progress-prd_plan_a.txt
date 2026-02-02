@@ -250,3 +250,31 @@ Phase 5 - Frontend Webapp (IN PROGRESS)
 - add_adk_fastapi_endpoint() parameter order is (app, agent, path) not (app, path, agent) — must check function signatures
 - ADKAgent.from_app() accepts the App object as first positional arg, with session_service and artifact_service as kwargs
 - Phase 4 is now complete — single story for backend server done
+
+### Story 5.1: Webapp scaffold with Next.js, CopilotKit, and dependencies
+**Completed:** 2026-02-01
+**Phase:** 5 - Frontend Webapp
+
+**What Was Done:**
+- Created webapp/ via create-next-app@latest with Next.js 16.1.6, React 19.2.3, TypeScript 5, Tailwind CSS 4
+- Installed CopilotKit v1.50 (@copilotkit/react-core, @copilotkit/react-ui, @copilotkit/runtime)
+- Installed @ag-ui/client, hono, lucide-react, clsx, tailwind-merge
+- Installed dev deps: vitest, @vitejs/plugin-react, @testing-library/react, @testing-library/jest-dom, jsdom@25
+- Created vitest.config.ts with jsdom environment, React plugin, and @/ path alias
+- Created src/__tests__/setup.ts with @testing-library/jest-dom import
+- Created src/__tests__/scaffold.test.ts with 6 tests (package.json exists, deps present, A2UI deps absent, layout exists)
+- Updated src/app/layout.tsx with dark theme (className="dark"), Geist fonts, Providers wrapper, Spreadsheet Validator metadata
+- Created src/app/Providers.tsx as stub (children passthrough) for future CopilotKit provider
+- Simplified src/app/page.tsx to minimal Spreadsheet Validator heading
+- tsconfig.json already has @/* -> ./src/* path alias from create-next-app
+
+**Verification:**
+- npm run build: PASS (Next.js 16.1.6 Turbopack, compiled successfully)
+- npx vitest run: PASS (6 passed)
+- All acceptance criteria: Satisfied
+
+**Learnings:**
+- jsdom@27 (latest) has ESM/CJS incompatibility with vitest — use jsdom@25 for stable testing
+- create-next-app@latest now prompts for React Compiler — pipe "n" to stdin for non-interactive
+- next-env.d.ts is gitignored by default in newer Next.js — don't try to stage it
+- Phase 5 begins — first frontend story done

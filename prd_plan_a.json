@@ -270,7 +270,7 @@
       "phase": 5,
       "depends_on": [],
       "spec": "validator-agent/docs/phases/phase-05-frontend-webapp.md#story-5.1",
-      "passes": false,
+      "passes": true,
       "description": "Create webapp/ directory. Initialize with Next.js 16, React 19, TypeScript 5. Install dependencies: @copilotkit/react-core@~1.50, @copilotkit/react-ui@~1.50, @copilotkit/runtime@~1.50, @ag-ui/client@^0.0.42, hono@^4.6.18, lucide-react, clsx, tailwind-merge. Do NOT install @copilotkit/a2ui-renderer or @a2ui/lit \u2014 not used in Plan A. Configure Tailwind CSS 4. Create src/app/layout.tsx with dark theme, geist fonts, Providers wrapper. Create tsconfig.json with path alias @/ -> src/.",
       "acceptanceCriteria": [
         "npm install succeeds",
