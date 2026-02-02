@@ -119,16 +119,14 @@ async def upload_file(thread_id: str, file: UploadFile = File(...)):
             artifact=artifact,
         )
 
-        # Update session state
-        session = await session_service.get_session(
-            app_name=APP_NAME,
-            user_id=USER_ID,
-            session_id=session_id,
-        )
-        if session:
-            session.state["uploaded_file"] = filename
-            session.state["file_name"] = filename
-            session.state["status"] = "UPLOADING"
+        # Update session state on the stored session directly.
+        # InMemorySessionService.get_session() returns a deep copy,
+        # so we must access the internal sessions dict to persist changes.
+        stored = session_service.sessions.get(APP_NAME, {}).get(USER_ID, {}).get(session_id)
+        if stored:
+            stored.state["uploaded_file"] = filename
+            stored.state["file_name"] = filename
+            stored.state["status"] = "UPLOADING"
 
     logger.info("Uploaded %s (%d bytes) for thread %s", filename, len(content), thread_id)
     return {"status": "uploaded", "file_name": filename, "size": len(content)}
