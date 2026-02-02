@@ -425,7 +425,7 @@
         "5.6"
       ],
       "spec": "validator-agent/docs/phases/phase-06-integration-quality.md#story-6.2",
-      "passes": false,
+      "passes": true,
       "description": "Run npm run build to verify Next.js compiles without errors. Run npm run lint (eslint) to verify no lint issues. Run ruff check . and ruff format --check . on the backend. Fix any issues found. Verify no TypeScript errors in strict mode.",
       "acceptanceCriteria": [
         "npm run build succeeds with exit code 0",

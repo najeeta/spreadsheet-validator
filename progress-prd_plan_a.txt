@@ -22,6 +22,8 @@
 - 5.4: Custom React card components for pipeline states
 - 5.5: useCoAgentStateRender hook for state-driven card rendering
 - 5.6: Main page with file upload, chat, and state rendering
+- 6.1: End-to-end integration test — upload to completion
+- 6.2: Frontend build verification and lint
 
 ## Current Phase
 Phase 1 - Project Scaffold & Models (COMPLETE)
@@ -29,7 +31,7 @@ Phase 2 - Tools (COMPLETE)
 Phase 3 - Agent Core (COMPLETE)
 Phase 4 - Backend Server (COMPLETE)
 Phase 5 - Frontend Webapp (COMPLETE)
-Phase 6 - Integration & Quality (IN PROGRESS)
+Phase 6 - Integration & Quality (COMPLETE)
 
 ## Learnings & Patterns
 (To be updated as implementation progresses)
@@ -426,3 +428,29 @@ Phase 6 - Integration & Quality (IN PROGRESS)
 - InMemorySessionService.get_session() returns copy.deepcopy(session) — direct mutations to the returned session object's state dict do NOT persist. Must access session_service.sessions[app][user][session_id].state directly for persistent updates
 - The MIXED_CSV with INVALID row triggers multiple validation rules: bad employee_id, invalid dept, negative amount, invalid currency, wrong date format, empty vendor
 - test_data.csv fixture (3 clean rows) is ideal for the happy-path tool chain test; MIXED_CSV (4 rows, 1 invalid) tests error separation
+
+### Story 6.2: Frontend build verification and lint
+**Completed:** 2026-02-01
+**Phase:** 6 - Integration & Quality
+
+**What Was Done:**
+- Ran all 6 quality checks: ruff check, ruff format --check, pytest, npm run build, npm run lint, npx vitest run
+- Fixed 2 ESLint warnings in frontend test files:
+  - Removed unused `AgentState` type import from src/__tests__/types.test.ts
+  - Fixed unused `bar` variable in src/__tests__/cards.test.tsx (renamed to `progressBar` with `void` to acknowledge intentionally unused)
+- Backend: 131 tests passing, ruff lint and format clean (31 files)
+- Frontend: 51 tests passing, Next.js build successful, ESLint clean (0 errors, 0 warnings)
+
+**Verification:**
+- ruff check .: PASS ("All checks passed!")
+- ruff format --check .: PASS ("31 files already formatted")
+- pytest tests/ -v: PASS (131 passed)
+- npm run build: PASS ("Compiled successfully in 10.2s")
+- npm run lint: PASS (clean output, 0 errors, 0 warnings)
+- npx vitest run: PASS (51 passed, 7 test files)
+- All acceptance criteria: Satisfied
+
+**Learnings:**
+- ESLint warnings for unused variables are caught by @typescript-eslint/no-unused-vars — always run lint as final quality gate
+- The `void` expression is the cleanest way to acknowledge an intentionally unused variable in TypeScript without disabling the lint rule
+- All 15 stories across 6 phases are now complete — the project is fully built and quality-verified
