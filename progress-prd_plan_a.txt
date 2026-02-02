@@ -17,6 +17,7 @@
 ## Current Phase
 Phase 1 - Project Scaffold & Models (COMPLETE)
 Phase 2 - Tools (COMPLETE)
+Phase 3 - Agent Core (IN PROGRESS)
 
 ## Learnings & Patterns
 (To be updated as implementation progresses)
@@ -173,3 +174,26 @@ Phase 2 - Tools (COMPLETE)
 - The spec used `Part.from_data()` but the installed google-genai version uses `Part.from_bytes(data=..., mime_type=...)` — always check the actual API surface
 - Part.from_bytes returns an object with `inline_data.data` (bytes) and `inline_data.mime_type` — tests can verify Excel validity by reading artifact.inline_data.data with pd.read_excel
 - Phase 2 is now complete — all 3 tool stories done (ingestion, validation, processing)
+
+### Story 3.1: Sub-agents — IngestionAgent, ValidationAgent, ProcessingAgent
+**Completed:** 2026-02-01
+**Phase:** 3 - Agent Core
+
+**What Was Done:**
+- Created app/agents/ingestion.py with IngestionAgent (LlmAgent, 3 tools, output_key='ingestion_result')
+- Created app/agents/validation.py with ValidationAgent (LlmAgent, 3 tools, output_key='validation_result')
+- Created app/agents/processing.py with ProcessingAgent (LlmAgent, 2 tools, output_key='processing_result')
+- Updated app/agents/__init__.py to export all three agents
+- Created tests/agents/test_sub_agents.py with 19 tests across 4 test classes
+- No render_a2ui tool on any agent — Plan A state-driven rendering
+
+**Verification:**
+- pytest tests/agents/test_sub_agents.py -v: PASS (19 passed)
+- pytest tests/ -v: PASS (98 passed, all stories including previous)
+- ruff check . && ruff format --check .: PASS
+- All acceptance criteria: Satisfied
+
+**Learnings:**
+- The spec uses `from google.adk import LlmAgent` but the installed version requires `from google.adk.agents import LlmAgent` — google.adk only exports `Agent` at top level
+- LlmAgent constructor accepts kwargs via pydantic model (name, model, instruction, tools, output_key) — works as expected
+- Tool functions passed directly to LlmAgent.tools retain their __name__ attribute, making test assertions straightforward

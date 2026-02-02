@@ -194,7 +194,7 @@
         "2.3"
       ],
       "spec": "validator-agent/docs/phases/phase-03-agent-core.md#story-3.1",
-      "passes": false,
+      "passes": true,
       "description": "Create app/agents/ingestion.py with IngestionAgent (LlmAgent, model=gemini-2.0-flash, tools=[request_file_upload, ingest_file, ingest_uploaded_file], output_key='ingestion_result'). Create app/agents/validation.py with ValidationAgent (tools=[validate_data, request_user_fix, write_fix], output_key='validation_result'). No render_a2ui tool on any agent. Create app/agents/processing.py with ProcessingAgent (tools=[transform_data, package_results], output_key='processing_result'). Each has clear instruction text describing their role and workflow. Export from app/agents/__init__.py.",
       "acceptanceCriteria": [
         "IngestionAgent has 3 tools: request_file_upload, ingest_file, ingest_uploaded_file",
