@@ -291,7 +291,7 @@
         "5.1"
       ],
       "spec": "validator-agent/docs/phases/phase-05-frontend-webapp.md#story-5.2",
-      "passes": false,
+      "passes": true,
       "description": "Create src/lib/types.ts with AgentState type matching backend PipelineState exactly. PipelineStatus union includes all 10 values. ValidationError and FixRequest types for nested objects. DEFAULT_INITIAL_STATE constant. Create src/app/Providers.tsx with CopilotKitProvider \u2014 runtimeUrl='/api/copilotkit', NO renderActivityMessages prop (no A2UI renderer). Just wraps children.",
       "acceptanceCriteria": [
         "AgentState type has all fields matching PipelineState",

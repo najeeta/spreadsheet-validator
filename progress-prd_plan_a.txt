@@ -278,3 +278,25 @@ Phase 5 - Frontend Webapp (IN PROGRESS)
 - create-next-app@latest now prompts for React Compiler — pipe "n" to stdin for non-interactive
 - next-env.d.ts is gitignored by default in newer Next.js — don't try to stage it
 - Phase 5 begins — first frontend story done
+
+### Story 5.2: AgentState types and CopilotKit Providers (no A2UI renderer)
+**Completed:** 2026-02-01
+**Phase:** 5 - Frontend Webapp
+
+**What Was Done:**
+- Created src/lib/types.ts with AgentState interface, PipelineStatus union (10 values), ValidationError, FixRequest types, and DEFAULT_INITIAL_STATE constant
+- All fields match backend PipelineState exactly (14 fields)
+- Updated src/app/Providers.tsx to wrap children in CopilotKitProvider with runtimeUrl='/api/copilotkit'
+- CopilotKit v1.50 exports provider as `CopilotKit` — aliased to `CopilotKitProvider` for clarity
+- No renderActivityMessages prop — Plan A state-driven rendering
+- Created src/__tests__/types.test.ts with 9 tests verifying DEFAULT_INITIAL_STATE and PipelineStatus
+- Created src/__tests__/providers.test.tsx with 2 tests verifying provider source code
+
+**Verification:**
+- npx vitest run: PASS (17 passed — 6 scaffold + 9 types + 2 providers)
+- npm run build: PASS (Next.js 16.1.6 Turbopack compiled successfully)
+- All acceptance criteria: Satisfied
+
+**Learnings:**
+- CopilotKit v1.50 exports the provider as `CopilotKit` not `CopilotKitProvider` — use `import { CopilotKit as CopilotKitProvider }` for readability
+- The runtimeUrl prop accepts a relative path ('/api/copilotkit') — Next.js API routes handle the proxy
