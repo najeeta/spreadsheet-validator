@@ -8,6 +8,7 @@
 
 ## Completed Stories
 - 1.1: Project scaffold with pyproject.toml and directory structure
+- 1.2: PipelineState Pydantic model with aligned status values
 
 ## Current Phase
 Phase 1 - Project Scaffold & Models (IN PROGRESS)
@@ -54,3 +55,24 @@ Phase 1 - Project Scaffold & Models (IN PROGRESS)
 - Hatchling requires `[tool.hatch.build.targets.wheel] packages = ["app"]` when the package name doesn't match the project name
 - `uv sync` without `--all-extras` won't install `[project.optional-dependencies]`, but `[dependency-groups]` are installed by default
 - Must use `uv run pytest` (not bare `pytest`) to ensure the virtual env is used
+
+### Story 1.2: PipelineState Pydantic model with aligned status values
+**Completed:** 2026-02-01
+**Phase:** 1 - Project Scaffold & Models
+
+**What Was Done:**
+- Created app/models.py with PipelineState Pydantic model
+- 10-value Status Literal: IDLE, UPLOADING, RUNNING, VALIDATING, WAITING_FOR_USER, FIXING, TRANSFORMING, PACKAGING, COMPLETED, FAILED
+- All fields with sensible defaults (status="IDLE", empty lists/dicts, validation_complete=False, usd_rounding="cents")
+- No ui_events field — Plan A uses state-driven rendering
+- Created tests/foundation/test_pipeline_state.py with 23 tests across 3 test classes
+
+**Verification:**
+- pytest tests/foundation/test_pipeline_state.py -v: PASS (23 passed)
+- pytest tests/ -v: PASS (28 passed, including story 1.1 tests)
+- ruff check . && ruff format --check .: PASS
+- All acceptance criteria: Satisfied
+
+**Learnings:**
+- ruff format adjusts blank line spacing — run `ruff format` before committing to avoid format check failures
+- PipelineState uses `list[dict]` and `dict[str, str]` for mutable defaults — Pydantic handles default factory automatically

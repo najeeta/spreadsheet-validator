@@ -58,7 +58,7 @@
         "1.1"
       ],
       "spec": "validator-agent/docs/phases/phase-01-scaffold-models.md#story-1.2",
-      "passes": false,
+      "passes": true,
       "description": "Create app/models.py with PipelineState(BaseModel). Status Literal must include all values that tools and agents actually set: IDLE, UPLOADING, RUNNING, VALIDATING, WAITING_FOR_USER, FIXING, TRANSFORMING, PACKAGING, COMPLETED, FAILED. Fields: status, active_run_id (Optional[str]), file_path (Optional[str]), file_name (Optional[str]), uploaded_file (Optional[str]), dataframe_records (list[dict]), dataframe_columns (list[str]), validation_errors (list[dict]), validation_complete (bool), pending_fixes (list[dict]), artifacts (dict[str,str]), as_of (Optional[str]), usd_rounding (Optional[Literal['cents','whole']]), cost_center_map (dict[str,str]). No ui_events field \u2014 Plan A does not use A2UI events.",
       "acceptanceCriteria": [
         "PipelineState can be instantiated with defaults: PipelineState()",
