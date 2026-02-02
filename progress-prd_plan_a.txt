@@ -10,10 +10,11 @@
 - 1.1: Project scaffold with pyproject.toml and directory structure
 - 1.2: PipelineState Pydantic model with aligned status values
 - 1.3: Agent callbacks: state initialization and prompt injection
+- 2.1: Ingestion tools: request_file_upload, ingest_file, ingest_uploaded_file
 
 ## Current Phase
 Phase 1 - Project Scaffold & Models (COMPLETE)
-Phase 2 - Tools (NEXT)
+Phase 2 - Tools (IN PROGRESS)
 
 ## Learnings & Patterns
 (To be updated as implementation progresses)
@@ -101,3 +102,27 @@ Phase 2 - Tools (NEXT)
 - Using lambdas for mutable defaults in _STATE_DEFAULTS dict ensures fresh copies on each call
 - PropertyMock on type() is needed to mock agent_name as a property on MagicMock
 - Phase 1 is now complete — all 3 foundation stories done
+
+### Story 2.1: Ingestion tools: request_file_upload, ingest_file, ingest_uploaded_file
+**Completed:** 2026-02-01
+**Phase:** 2 - Tools
+
+**What Was Done:**
+- Created app/tools/ingestion.py with 3 tools: request_file_upload, ingest_file, ingest_uploaded_file
+- request_file_upload returns waiting_for_upload status with accepted formats (.csv, .xlsx, .xls)
+- ingest_file reads CSV/XLSX from disk via pandas, populates state with records, columns, file_path, file_name, status=RUNNING
+- ingest_uploaded_file reads from ADK ArtifactService via load_artifact(), parses CSV/XLSX with fallback
+- Updated app/tools/__init__.py to export all 3 ingestion tools
+- Created tests/fixtures/test_data.csv with 3 sample rows
+- Created tests/tools/test_ingestion.py with 11 tests across 3 test classes
+
+**Verification:**
+- pytest tests/tools/test_ingestion.py -v: PASS (11 passed)
+- pytest tests/ -v: PASS (46 passed, all stories including previous)
+- ruff check . && ruff format --check .: PASS
+- All acceptance criteria: Satisfied
+
+**Learnings:**
+- MagicMock state dict works well for tool_context.state mocking — no need for complex ADK ToolContext setup
+- AsyncMock from unittest.mock is required for load_artifact since it's an async method
+- Pandas read_csv/read_excel handles the heavy lifting; tools just bridge between ADK state and pandas

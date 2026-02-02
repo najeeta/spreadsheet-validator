@@ -109,7 +109,7 @@
         "1.2"
       ],
       "spec": "validator-agent/docs/phases/phase-02-tools.md#story-2.1",
-      "passes": false,
+      "passes": true,
       "description": "Create app/tools/ingestion.py. (1) request_file_upload(tool_context) \u2014 returns dict with status='waiting_for_upload', accepted_formats. (2) ingest_file(tool_context, file_path: str) \u2014 reads CSV/XLSX via pandas, sets state: dataframe_records, dataframe_columns, file_path, status='RUNNING'. Returns row_count and columns. (3) async ingest_uploaded_file(tool_context) \u2014 reads state['uploaded_file'], loads artifact via tool_context.load_artifact(), parses with pandas. Sets same state keys. Falls back to xlsx->csv parsing. Export all three from app/tools/__init__.py.",
       "acceptanceCriteria": [
         "request_file_upload returns status='waiting_for_upload' with accepted_formats",
