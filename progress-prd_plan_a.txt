@@ -16,6 +16,9 @@
 - 3.1: Sub-agents: IngestionAgent, ValidationAgent, ProcessingAgent
 - 3.2: Root agent: SpreadsheetValidatorAgent orchestrator
 - 4.1: FastAPI server with AG-UI SSE endpoint and REST endpoints
+- 5.1: Webapp scaffold with Next.js, CopilotKit, and dependencies
+- 5.2: AgentState types and CopilotKit Providers (no A2UI renderer)
+- 5.3: CopilotKit API route with HttpAgent
 
 ## Current Phase
 Phase 1 - Project Scaffold & Models (COMPLETE)
@@ -300,3 +303,27 @@ Phase 5 - Frontend Webapp (IN PROGRESS)
 **Learnings:**
 - CopilotKit v1.50 exports the provider as `CopilotKit` not `CopilotKitProvider` — use `import { CopilotKit as CopilotKitProvider }` for readability
 - The runtimeUrl prop accepts a relative path ('/api/copilotkit') — Next.js API routes handle the proxy
+
+### Story 5.3: CopilotKit API route with HttpAgent
+**Completed:** 2026-02-01
+**Phase:** 5 - Frontend Webapp
+
+**What Was Done:**
+- Created src/app/api/copilotkit/[[...handle]]/route.ts with CopilotRuntime and HttpAgent
+- HttpAgent from @ag-ui/client points to backend /agent SSE endpoint (configurable via NEXT_PUBLIC_AGENT_URL, defaults to http://localhost:8080/agent)
+- CopilotRuntime configured with agent keyed as 'spreadsheet_validator' to match backend ADK app name
+- Uses copilotRuntimeNextJSAppRouterEndpoint for Next.js App Router integration
+- ExperimentalEmptyAdapter as service adapter (agent-only, no direct LLM calls through frontend)
+- GET and POST handlers exported from handleRequest
+- Created src/__tests__/route.test.ts with 6 source-level tests
+
+**Verification:**
+- npx vitest run: PASS (23 passed — 6 scaffold + 9 types + 2 providers + 6 route)
+- npm run build: PASS (Next.js compiled, route recognized as dynamic: /api/copilotkit/[[...handle]])
+- All acceptance criteria: Satisfied
+
+**Learnings:**
+- The spec referenced `createCopilotRuntimeNextJSAppRouterEndpoint` but the actual export is `copilotRuntimeNextJSAppRouterEndpoint` (no "create" prefix)
+- copilotRuntimeNextJSAppRouterEndpoint returns `{ handleRequest }` not `{ GET, POST }` — need to manually alias: `export const GET = handleRequest; export const POST = handleRequest;`
+- The spec mentioned using hono/vercel handle, but the standard CopilotKit runtime Next.js endpoint works directly without hono for App Router routes
+- ExperimentalEmptyAdapter is the correct service adapter for agent-only setups where the LLM calls go through the backend agent, not the frontend runtime

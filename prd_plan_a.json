@@ -311,7 +311,7 @@
         "5.1"
       ],
       "spec": "validator-agent/docs/phases/phase-05-frontend-webapp.md#story-5.3",
-      "passes": false,
+      "passes": true,
       "description": "Create src/app/api/copilotkit/[[...handle]]/route.ts. Use CopilotRuntime from @copilotkit/runtime/v2 with HttpAgent from @ag-ui/client pointing to the backend /agent endpoint (configurable via NEXT_PUBLIC_AGENT_URL env var, default http://localhost:8080/agent). Use createCopilotEndpoint with hono/vercel handle. Export GET and POST handlers. The agent key should be 'spreadsheet_validator' to match the backend ADK app name.",
       "acceptanceCriteria": [
         "route.ts exports GET and POST handlers",
