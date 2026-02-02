@@ -403,3 +403,26 @@ Phase 6 - Integration & Quality (IN PROGRESS)
 - Nested CopilotKitProvider in the page overrides the layout-level provider with page-specific agent and threadId
 - useA2UIStateRender must be called within CopilotKit context — extracted to a ChatWithStateRender child component
 - Phase 5 is now complete — all 6 frontend webapp stories done
+
+### Story 6.1: End-to-end integration test — upload to completion
+**Completed:** 2026-02-01
+**Phase:** 6 - Integration & Quality
+
+**What Was Done:**
+- Created tests/e2e/test_full_pipeline.py with 6 tests across 3 test classes
+- TestFullPipeline: session creation, CSV upload, and session state verification via REST endpoints
+- TestToolChainDirect: direct tool chain (ingest -> validate -> transform -> package) with both clean and mixed data
+- TestArtifactDownload: artifact endpoint 404 verification
+- Fixed bug in app/server.py upload endpoint — InMemorySessionService.get_session() returns deep copies, so state mutations were lost. Changed to access internal sessions dict directly for persistent state updates
+- Mixed CSV with valid and invalid rows for realistic error coverage
+
+**Verification:**
+- pytest tests/e2e/ -v: PASS (6 passed)
+- pytest tests/ -v: PASS (131 passed — all stories including previous)
+- ruff check . && ruff format --check .: PASS
+- All acceptance criteria: Satisfied
+
+**Learnings:**
+- InMemorySessionService.get_session() returns copy.deepcopy(session) — direct mutations to the returned session object's state dict do NOT persist. Must access session_service.sessions[app][user][session_id].state directly for persistent updates
+- The MIXED_CSV with INVALID row triggers multiple validation rules: bad employee_id, invalid dept, negative amount, invalid currency, wrong date format, empty vendor
+- test_data.csv fixture (3 clean rows) is ideal for the happy-path tool chain test; MIXED_CSV (4 rows, 1 invalid) tests error separation

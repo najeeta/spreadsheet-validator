@@ -402,7 +402,7 @@
         "5.6"
       ],
       "spec": "validator-agent/docs/phases/phase-06-integration-quality.md#story-6.1",
-      "passes": false,
+      "passes": true,
       "description": "Create tests/e2e/test_full_pipeline.py. Uses httpx AsyncClient with the FastAPI app. Steps: (1) POST /run to create session. (2) POST /upload with a test CSV containing both valid and invalid rows. (3) Verify session state has uploaded_file set. (4) Verify the ADK agent can process the session (this may require a mock or live Gemini call \u2014 use pytest.mark.skipif for CI). For unit-testable verification: call tools directly in sequence: ingest_uploaded_file, validate_data, transform_data, package_results. Verify final state: status=COMPLETED, artifacts has success.xlsx and errors.xlsx, validation_errors populated. Verify artifacts are downloadable via GET /artifacts/success.xlsx.",
       "acceptanceCriteria": [
         "Test creates session via POST /run",
