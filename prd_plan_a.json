@@ -353,7 +353,7 @@
         "5.2"
       ],
       "spec": "validator-agent/docs/phases/phase-05-frontend-webapp.md#story-5.5",
-      "passes": false,
+      "passes": true,
       "description": "Create src/hooks/useA2UIStateRender.ts. Uses useCoAgentStateRender<AgentState> from @copilotkit/react-core with name='spreadsheet_validator'. Render function checks state.status and returns appropriate component: COMPLETED->CompletionCard, TRANSFORMING/PACKAGING->ProgressCard, VALIDATING/FIXING/WAITING_FOR_USER with data->ValidationResultsCard, RUNNING with data->IngestionSummaryCard. Derives counts from array lengths (totalRows=dataframe_records.length, errorCount=validation_errors.length). Returns null when no card applies.",
       "acceptanceCriteria": [
         "Hook calls useCoAgentStateRender with name='spreadsheet_validator'",

@@ -350,3 +350,25 @@ Phase 5 - Frontend Webapp (IN PROGRESS)
 - The spec's test used `/10/` regex which matches both "10" and "100" — changed to exact string `"10"` for the error count assertion to avoid TestingLibraryElementError on multiple matches
 - lucide-react icons (FileSpreadsheet, ShieldCheck, ShieldAlert, Loader2, CheckCircle2, Download) render as SVGs with aria-hidden in jsdom — the animate-spin class on Loader2 is testable via container.querySelector(".animate-spin")
 - data-testid attribute on the progress bar div makes it directly queryable in tests
+
+### Story 5.5: useCoAgentStateRender hook for state-driven card rendering
+**Completed:** 2026-02-01
+**Phase:** 5 - Frontend Webapp
+
+**What Was Done:**
+- Created src/hooks/useA2UIStateRender.ts wrapping CopilotKit's useCoAgentStateRender hook
+- Maps pipeline status to card components: COMPLETED->CompletionCard, TRANSFORMING/PACKAGING->ProgressCard, VALIDATING/FIXING/WAITING_FOR_USER->ValidationResultsCard, RUNNING->IngestionSummaryCard
+- Derives all counts from state array lengths: totalRows from dataframe_records.length, errorCount from validation_errors.length, fixedCount from pending_fixes.length, columnCount from dataframe_columns.length
+- Returns null for IDLE/initial state and when no data is loaded
+- Agent name set to 'spreadsheet_validator' matching the backend ADK app name
+- Created src/__tests__/useA2UIStateRender.test.tsx with 8 source-level tests (file-based since hook requires CopilotKit context)
+
+**Verification:**
+- npx vitest run: PASS (43 passed — 6 scaffold + 9 types + 2 providers + 6 route + 12 cards + 8 hook)
+- npm run build: PASS (Next.js compiled successfully)
+- All acceptance criteria: Satisfied
+
+**Learnings:**
+- useCoAgentStateRender from @copilotkit/react-core takes { name, render } where render receives { status, state, nodeName } — the render function returns ReactNode
+- Since the hook requires CopilotKit context providers, tests use source-level file content assertions rather than rendering the hook directly
+- createElement is used instead of JSX to keep the hook file as .ts (not .tsx) — spec explicitly names it useA2UIStateRender.ts
