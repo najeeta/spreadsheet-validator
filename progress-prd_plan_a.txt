@@ -19,13 +19,17 @@
 - 5.1: Webapp scaffold with Next.js, CopilotKit, and dependencies
 - 5.2: AgentState types and CopilotKit Providers (no A2UI renderer)
 - 5.3: CopilotKit API route with HttpAgent
+- 5.4: Custom React card components for pipeline states
+- 5.5: useCoAgentStateRender hook for state-driven card rendering
+- 5.6: Main page with file upload, chat, and state rendering
 
 ## Current Phase
 Phase 1 - Project Scaffold & Models (COMPLETE)
 Phase 2 - Tools (COMPLETE)
 Phase 3 - Agent Core (COMPLETE)
 Phase 4 - Backend Server (COMPLETE)
-Phase 5 - Frontend Webapp (IN PROGRESS)
+Phase 5 - Frontend Webapp (COMPLETE)
+Phase 6 - Integration & Quality (IN PROGRESS)
 
 ## Learnings & Patterns
 (To be updated as implementation progresses)
@@ -372,3 +376,30 @@ Phase 5 - Frontend Webapp (IN PROGRESS)
 - useCoAgentStateRender from @copilotkit/react-core takes { name, render } where render receives { status, state, nodeName } — the render function returns ReactNode
 - Since the hook requires CopilotKit context providers, tests use source-level file content assertions rather than rendering the hook directly
 - createElement is used instead of JSX to keep the hook file as .ts (not .tsx) — spec explicitly names it useA2UIStateRender.ts
+
+### Story 5.6: Main page with file upload, chat, and state rendering
+**Completed:** 2026-02-01
+**Phase:** 5 - Frontend Webapp
+
+**What Was Done:**
+- Updated src/app/page.tsx as "use client" component with full file upload and chat functionality
+- Generates threadId via useMemo(() => crypto.randomUUID(), []) for session continuity
+- File upload handler: creates FormData, POSTs to backend /upload?thread_id=X, shows upload status
+- Pre-creates backend session via POST /run?thread_id=X before first upload (ensureSession)
+- CopilotKitProvider wraps page content with agent="spreadsheet_validator" and threadId
+- CopilotChat with custom Input component: file upload button + text input for chat messages
+- useA2UIStateRender() called via ChatWithStateRender child component for state-driven card rendering
+- Status bar shows uploading spinner, uploaded file name, or error messages
+- Created src/__tests__/page.test.tsx with 8 source-level tests
+
+**Verification:**
+- npx vitest run: PASS (51 passed — 6 scaffold + 9 types + 2 providers + 6 route + 12 cards + 8 hook + 8 page)
+- npm run build: PASS (Next.js 16.1.6 Turbopack compiled successfully)
+- All acceptance criteria: Satisfied
+
+**Learnings:**
+- CopilotChat v1.50 does NOT have agentId, threadId, or Header props — agent and threadId go on CopilotKitProvider
+- CopilotChat Input prop receives { inProgress, onSend, isVisible, onStop, ... } not { children }
+- Nested CopilotKitProvider in the page overrides the layout-level provider with page-specific agent and threadId
+- useA2UIStateRender must be called within CopilotKit context — extracted to a ChatWithStateRender child component
+- Phase 5 is now complete — all 6 frontend webapp stories done

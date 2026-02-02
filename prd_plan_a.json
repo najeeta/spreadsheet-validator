@@ -378,7 +378,7 @@
         "5.3"
       ],
       "spec": "validator-agent/docs/phases/phase-05-frontend-webapp.md#story-5.6",
-      "passes": false,
+      "passes": true,
       "description": "Create src/app/page.tsx as client component. Generates threadId via useMemo(crypto.randomUUID). Manages file upload via hidden input + button. Upload handler: creates FormData, POSTs to backend /upload?thread_id=X, on success triggers agent via copilotkit.runAgent() with a message containing the file name. Calls useA2UIStateRender() to activate card rendering. Renders CopilotChat with agentId='spreadsheet_validator', threadId, file upload button in input area, and placeholder text. Status bar at top shows upload progress.",
       "acceptanceCriteria": [
         "Page renders CopilotChat with agentId='spreadsheet_validator'",
