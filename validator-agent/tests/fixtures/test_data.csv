@@ -1,0 +1,4 @@
+employee_id,dept,amount,currency,spend_date,vendor,fx_rate
+EMP001,Engineering,1500.00,USD,2024-01-15,Acme Corp,1.0
+EMP002,Marketing,2500.50,EUR,2024-02-20,Beta Inc,1.08
+EMP003,Sales,750.00,GBP,2024-03-10,Gamma Ltd,1.27
