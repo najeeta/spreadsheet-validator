@@ -135,7 +135,7 @@
         "1.2"
       ],
       "spec": "validator-agent/docs/phases/phase-02-tools.md#story-2.2",
-      "passes": false,
+      "passes": true,
       "description": "Create app/tools/validation.py. (1) validate_data(tool_context, as_of_date: Optional[str]) \u2014 validates all records against 7 rules (employee_id regex+unique, dept enum, amount range, currency enum, spend_date format+not-future, vendor non-empty, fx_rate required for non-USD). Populates state['validation_errors'] with [{row_index, row_data, errors: [{field, error}]}]. Sets validation_complete=True, status='VALIDATING'. (2) request_user_fix(tool_context, row_index, field, current_value, error_message) \u2014 appends to state['pending_fixes'], sets status='WAITING_FOR_USER'. (3) write_fix(tool_context, row_index, field, new_value) \u2014 updates record, removes from pending_fixes, sets status='RUNNING' when empty.",
       "acceptanceCriteria": [
         "validate_data catches invalid employee_id patterns",

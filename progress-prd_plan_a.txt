@@ -11,6 +11,7 @@
 - 1.2: PipelineState Pydantic model with aligned status values
 - 1.3: Agent callbacks: state initialization and prompt injection
 - 2.1: Ingestion tools: request_file_upload, ingest_file, ingest_uploaded_file
+- 2.2: Validation tools: validate_data, request_user_fix, write_fix
 
 ## Current Phase
 Phase 1 - Project Scaffold & Models (COMPLETE)
@@ -126,3 +127,26 @@ Phase 2 - Tools (IN PROGRESS)
 - MagicMock state dict works well for tool_context.state mocking — no need for complex ADK ToolContext setup
 - AsyncMock from unittest.mock is required for load_artifact since it's an async method
 - Pandas read_csv/read_excel handles the heavy lifting; tools just bridge between ADK state and pandas
+
+### Story 2.2: Validation tools: validate_data, request_user_fix, write_fix
+**Completed:** 2026-02-01
+**Phase:** 2 - Tools
+
+**What Was Done:**
+- Created app/tools/validation.py with 3 tools: validate_data, request_user_fix, write_fix
+- validate_data enforces 7 business rules: employee_id format+uniqueness, dept enum, amount range (0,100000], currency ISO 4217 enum, spend_date YYYY-MM-DD+not-future, vendor non-empty, fx_rate required for non-USD with range [0.1,500]
+- request_user_fix appends fix request to state["pending_fixes"] and sets status=WAITING_FOR_USER
+- write_fix updates the record value, removes from pending_fixes, transitions to RUNNING (empty) or FIXING (remaining)
+- Updated app/tools/__init__.py to export all 6 tools (3 ingestion + 3 validation)
+- Created tests/tools/test_validation.py with 23 tests across 9 test classes
+
+**Verification:**
+- pytest tests/tools/test_validation.py -v: PASS (23 passed)
+- pytest tests/ -v: PASS (69 passed, all stories including previous)
+- ruff check . && ruff format --check .: PASS
+- All acceptance criteria: Satisfied
+
+**Learnings:**
+- NaN check via `fx_rate != fx_rate` covers the pandas NaN case for missing fx_rate values
+- The as_of_date parameter on validate_data allows overriding the reference date for future-date checks (useful for testing)
+- ruff format needs to be run after writing code — spec-provided code often needs reformatting for line length and dict literal style
