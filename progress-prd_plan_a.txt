@@ -7,10 +7,10 @@
 - Architecture: ADK agents + ag-ui-adk SSE + CopilotKit useCoAgentStateRender + custom React cards
 
 ## Completed Stories
-(none yet)
+- 1.1: Project scaffold with pyproject.toml and directory structure
 
 ## Current Phase
-Phase 1 - Project Scaffold & Models (NOT STARTED)
+Phase 1 - Project Scaffold & Models (IN PROGRESS)
 
 ## Learnings & Patterns
 (To be updated as implementation progresses)
@@ -29,4 +29,28 @@ Phase 1 - Project Scaffold & Models (NOT STARTED)
 
 ## Iteration Log
 
-(No iterations completed yet)
+### Story 1.1: Project scaffold with pyproject.toml and directory structure
+**Completed:** 2026-02-01
+**Phase:** 1 - Project Scaffold & Models
+
+**What Was Done:**
+- Created pyproject.toml with all required dependencies (google-adk, fastapi, ag-ui-adk, pandas, etc.)
+- Set up app/ package with agents/ and tools/ sub-packages
+- Created tests/foundation/test_scaffold.py with 5 scaffold verification tests
+- Added tests/conftest.py and test __init__.py files
+- Created .env.example with GOOGLE_GENAI_USE_VERTEXAI and GOOGLE_API_KEY
+- Added [dependency-groups] dev section so `uv sync` installs dev deps by default
+- Added [tool.hatch.build.targets.wheel] packages config for hatchling
+
+**Verification:**
+- uv sync: PASS (131 packages installed)
+- pytest tests/foundation/test_scaffold.py -v: PASS (5 passed)
+- ruff check . && ruff format --check .: PASS
+- python -c 'import app': PASS
+- pytest --co: PASS (5 tests collected)
+- All acceptance criteria: Satisfied
+
+**Learnings:**
+- Hatchling requires `[tool.hatch.build.targets.wheel] packages = ["app"]` when the package name doesn't match the project name
+- `uv sync` without `--all-extras` won't install `[project.optional-dependencies]`, but `[dependency-groups]` are installed by default
+- Must use `uv run pytest` (not bare `pytest`) to ensure the virtual env is used

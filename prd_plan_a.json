@@ -38,7 +38,7 @@
       "phase": 1,
       "depends_on": [],
       "spec": "validator-agent/docs/phases/phase-01-scaffold-models.md#story-1.1",
-      "passes": false,
+      "passes": true,
       "description": "Create the project directory structure: validator-agent/app/ with __init__.py, agent.py, models.py, callbacks.py; validator-agent/app/agents/ with __init__.py; validator-agent/app/tools/ with __init__.py; validator-agent/tests/ with conftest.py. Create pyproject.toml with dependencies: google-adk>=1.15.0, fastapi>=0.100.0, uvicorn>=0.20.0, pandas>=2.0.0, openpyxl>=3.1.0, pydantic>=2.0.0, python-dotenv>=1.0.0, ag-ui-protocol>=0.1.10, ag-ui-adk>=0.4.2. Dev dependencies: pytest, pytest-asyncio, pytest-cov, httpx, ruff. Create .env.example with GOOGLE_GENAI_USE_VERTEXAI=FALSE and GOOGLE_API_KEY placeholder.",
       "acceptanceCriteria": [
         "Directory structure exists: app/, app/agents/, app/tools/, tests/",
