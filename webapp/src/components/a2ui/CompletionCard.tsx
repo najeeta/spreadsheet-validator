@@ -31,11 +31,10 @@ export function CompletionCard({
       file_name: null,
       dataframe_records: [],
       dataframe_columns: [],
-      pending_fixes: [],
-      skipped_fixes: [],
+      pending_review: [],
+      all_errors: [],
+      skipped_rows: [],
       artifacts: {},
-      validation_complete: false,
-      total_error_rows: 0,
       waiting_since: undefined,
     }));
     triggerUpload();

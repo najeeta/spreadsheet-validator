@@ -72,7 +72,7 @@ def validate_data(tool_context: Any, as_of_date: Optional[str] = None) -> dict:
     error_row_count = 0
 
     # Exclude rows already skipped by the user (they're done, flagged as errors)
-    skipped_indices = {f["row_index"] for f in state.get("skipped_fixes", [])}
+    skipped_indices = set(state.get("skipped_rows", []))
 
     for idx, row in enumerate(records):
         fp = fingerprints[idx] if idx < len(fingerprints) else ""
@@ -224,7 +224,7 @@ def validate_data(tool_context: Any, as_of_date: Optional[str] = None) -> dict:
 
         if row_errors:
             error_row_count += 1
-            # Add each error to pending_fixes
+            # Add each error to all_errors
             for field_err in row_errors:
                 pending.append(
                     {
@@ -241,36 +241,31 @@ def validate_data(tool_context: Any, as_of_date: Optional[str] = None) -> dict:
     total = len(records)
 
     if pending:
-        # Group errors by row and batch to FIX_BATCH_SIZE rows
+        # Store all errors as flat list (single source of truth)
+        state["all_errors"] = pending
+
+        # Batch first FIX_BATCH_SIZE rows into pending_review
         errors_by_row: dict[int, list[dict]] = defaultdict(list)
-        for fix in pending:
-            errors_by_row[fix["row_index"]].append(fix)
+        for err in pending:
+            errors_by_row[err["row_index"]].append(err)
 
-        all_error_row_indices = sorted(errors_by_row.keys())
-        batch_row_indices = all_error_row_indices[:FIX_BATCH_SIZE]
-        batch_pending: list[dict] = []
+        batch_row_indices = sorted(errors_by_row.keys())[:FIX_BATCH_SIZE]
+        batch: list[dict] = []
         for row_idx in batch_row_indices:
-            batch_pending.extend(errors_by_row[row_idx])
+            batch.extend(errors_by_row[row_idx])
 
-        # Store unbatched errors in remaining_fixes
-        remaining_pending: list[dict] = []
-        for row_idx in all_error_row_indices[FIX_BATCH_SIZE:]:
-            remaining_pending.extend(errors_by_row[row_idx])
-        state["remaining_fixes"] = remaining_pending
-
-        state["pending_fixes"] = batch_pending
-        # Include skipped rows in total error count for accurate data quality reporting
-        state["total_error_rows"] = error_row_count + len(skipped_indices)
+        state["pending_review"] = batch
         state["status"] = "WAITING_FOR_USER"
         state["waiting_since"] = time.time()
-        state["validation_complete"] = False
+
+        batch_size = len(batch_row_indices)
 
         logger.info(
             "Validation found %d errors in %d rows (skipped %d unchanged valid rows) - WAITING_FOR_USER, batch=%d rows",
             error_row_count,
             total,
             skipped_count,
-            len(batch_row_indices),
+            batch_size,
         )
 
         # Return explicit STOP instruction when errors exist
@@ -280,18 +275,16 @@ def validate_data(tool_context: Any, as_of_date: Optional[str] = None) -> dict:
             "total_rows": total,
             "valid_count": total - error_row_count,
             "error_count": error_row_count,
-            "pending_fixes_count": len(batch_pending),
-            "total_error_rows": error_row_count,
-            "batch_size": len(batch_row_indices),
+            "pending_review_count": len(batch),
+            "batch_size": batch_size,
             "skipped_unchanged": skipped_count,
-            "message": f"Found {error_row_count} rows with errors. Showing batch of {len(batch_row_indices)} rows. The user must fix these before processing can continue.",
+            "message": f"Found {error_row_count} rows with errors. Showing batch of {batch_size} rows. The user must fix these before processing can continue.",
         }
 
     # No errors - validation complete
-    state["pending_fixes"] = []
-    state["remaining_fixes"] = []
+    state["all_errors"] = []
+    state["pending_review"] = []
     state["status"] = "VALIDATING"
-    state["validation_complete"] = True
     state["waiting_since"] = None
 
     logger.info(
@@ -308,33 +301,6 @@ def validate_data(tool_context: Any, as_of_date: Optional[str] = None) -> dict:
         "valid_count": total - error_row_count,
         "error_count": error_row_count,
         "skipped_unchanged": skipped_count,
-    }
-
-
-def request_user_fix(
-    tool_context: Any,
-    row_index: int,
-    field: str,
-    current_value: str,
-    error_message: str,
-) -> dict:
-    """Queue a fix request for the user."""
-    state = tool_context.state
-    fix_request = {
-        "row_index": row_index,
-        "field": field,
-        "current_value": current_value,
-        "error_message": error_message,
-    }
-    state["pending_fixes"].append(fix_request)
-    state["status"] = "WAITING_FOR_USER"
-
-    logger.info("Fix requested: row %d, field '%s'", row_index, field)
-    return {
-        "status": "fix_requested",
-        "row_index": row_index,
-        "field": field,
-        "error_message": error_message,
     }
 
 
@@ -363,10 +329,7 @@ def batch_write_fixes(tool_context: Any, row_index: int, fixes: dict[str, Any]) 
 
 
 def skip_row(tool_context: Any, row_index: int) -> dict:
-    """Skip a single row — user chose not to fix it.
-
-    Moves the row's fixes from pending_fixes to skipped_fixes.
-    """
+    """Skip a single row — user chose not to fix it."""
     from app.fix_utils import apply_skip_row
 
     return apply_skip_row(tool_context.state, row_index)

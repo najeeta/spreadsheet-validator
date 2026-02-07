@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
+import { createContext, useContext, useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useCoAgent, useCopilotChat } from "@copilotkit/react-core";
 import { TextMessage, Role } from "@copilotkit/runtime-client-gql";
 import type { AgentState, RunGlobals } from "@/lib/types";
@@ -36,6 +36,28 @@ export function ValidatorProvider({
   // Single source of truth for agent state
   const [agentState, setAgentState] = useState<AgentState>(DEFAULT_INITIAL_STATE);
 
+  // Track whether user has clicked "Start Validation" to prevent
+  // ag-ui-adk STATE_SNAPSHOT from clobbering RUNNING back to IDLE
+  const pipelineStartedRef = useRef(false);
+
+  // Guarded setter: reject IDLE snapshots once the pipeline has started
+  const guardedSetState: typeof setAgentState = useMemo(
+    () => (action) => {
+      setAgentState((prev) => {
+        const next = typeof action === "function" ? action(prev) : action;
+        if (pipelineStartedRef.current && next.status === "IDLE" && prev.status !== "IDLE") {
+          return prev; // ignore stale IDLE snapshot from ag-ui-adk
+        }
+        // Reset the guard once the pipeline reaches a terminal state
+        if (next.status === "COMPLETED" || next.status === "FAILED") {
+          pipelineStartedRef.current = false;
+        }
+        return next;
+      });
+    },
+    [],
+  );
+
   // File upload state - owned by the provider
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -46,7 +68,7 @@ export function ValidatorProvider({
   useCoAgent<AgentState>({
     name: "spreadsheet_validator",
     state: agentState,
-    setState: setAgentState,
+    setState: guardedSetState,
   });
 
   const { appendMessage } = useCopilotChat();
@@ -59,6 +81,7 @@ export function ValidatorProvider({
   // Start pipeline: sync globals into agent state, switch to RUNNING, and send "Begin"
   const startPipeline = useCallback(
     (globals: RunGlobals) => {
+      pipelineStartedRef.current = true;
       setAgentState((prev) => ({
         ...(prev ?? DEFAULT_INITIAL_STATE),
         globals,
@@ -158,10 +181,10 @@ export function ValidatorProvider({
         status: (data.status as AgentState["status"]) ?? prev?.status ?? "IDLE",
         dataframe_records: data.dataframe_records ?? prev?.dataframe_records ?? [],
         dataframe_columns: data.dataframe_columns ?? prev?.dataframe_columns ?? [],
-        pending_fixes: data.pending_fixes ?? prev?.pending_fixes ?? [],
-        validation_errors: data.validation_errors ?? prev?.validation_errors ?? [],
+        pending_review: data.pending_review ?? prev?.pending_review ?? [],
+        all_errors: data.all_errors ?? prev?.all_errors ?? [],
+        skipped_rows: data.skipped_rows ?? prev?.skipped_rows ?? [],
         artifacts: data.artifacts ?? prev?.artifacts ?? {},
-        validation_complete: data.validation_complete ?? prev?.validation_complete ?? false,
       }));
     } catch (e) {
       console.error("[ValidatorProvider] Failed to hydrate from backend:", e);

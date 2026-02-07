@@ -4,12 +4,10 @@
 
 export type PipelineStatus =
   | "IDLE"
-  | "UPLOADING"
   | "INGESTING"
   | "RUNNING"
   | "VALIDATING"
   | "WAITING_FOR_USER"
-  | "FIXING"
   | "TRANSFORMING"
   | "PACKAGING"
   | "COMPLETED"
@@ -43,13 +41,11 @@ export interface AgentState {
   // and should NOT be in the initial state to avoid overwriting backend data
   dataframe_records?: Record<string, unknown>[];
   dataframe_columns?: string[];
-  pending_fixes?: FixRequest[];
-  skipped_fixes?: FixRequest[];
+  pending_review?: FixRequest[];
+  all_errors?: FixRequest[];
+  skipped_rows?: number[];
   waiting_since?: number;
-  total_error_rows?: number;
   artifacts?: Record<string, string>;
-  validation_errors?: unknown[];
-  validation_complete?: boolean;
   uploaded_file?: string;
 }
 
@@ -66,7 +62,7 @@ export const DEFAULT_INITIAL_STATE: AgentState = {
   status: "IDLE",
   file_name: null,
   globals: DEFAULT_GLOBALS,
-  // NOTE: dataframe_records, dataframe_columns, pending_fixes,
+  // NOTE: dataframe_records, dataframe_columns, pending_review,
   // artifacts are intentionally OMITTED here.
   // They are backend-only and will be received via SSE STATE_DELTA events.
 };

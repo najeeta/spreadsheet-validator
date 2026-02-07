@@ -25,9 +25,9 @@ class TestPipelineStateDefaults:
         state = PipelineState()
         assert state.dataframe_columns == []
 
-    def test_default_pending_fixes_empty(self):
+    def test_default_pending_review_empty(self):
         state = PipelineState()
-        assert state.pending_fixes == []
+        assert state.pending_review == []
 
     def test_default_artifacts_empty(self):
         state = PipelineState()
@@ -35,17 +35,15 @@ class TestPipelineStateDefaults:
 
 
 class TestPipelineStateStatusValues:
-    """All 10 status values should be accepted."""
+    """All 8 status values should be accepted."""
 
     @pytest.mark.parametrize(
         "status",
         [
             "IDLE",
-            "UPLOADING",
             "RUNNING",
             "VALIDATING",
             "WAITING_FOR_USER",
-            "FIXING",
             "TRANSFORMING",
             "PACKAGING",
             "COMPLETED",

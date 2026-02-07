@@ -44,9 +44,7 @@ describe("stateToCard shared logic", () => {
   it("imports all card components", () => {
     const source = fs.readFileSync(stateToCardPath, "utf8");
     expect(source).toContain("CompletionCard");
-    expect(source).toContain("ProgressCard");
     expect(source).toContain("FixesTable");
-    expect(source).toContain("UploadCard");
   });
 
   it("renders CompletionCard for COMPLETED status", () => {
@@ -64,9 +62,9 @@ describe("stateToCard shared logic", () => {
     expect(source).toContain("VALIDATING");
   });
 
-  it("renders ProgressCard for TRANSFORMING/PACKAGING", () => {
+  it("renders ProcessingSkeleton for TRANSFORMING/PACKAGING", () => {
     const source = fs.readFileSync(stateToCardPath, "utf8");
-    expect(source).toContain("ProgressCard");
+    expect(source).toContain("ProcessingSkeleton");
     expect(source).toContain("TRANSFORMING");
   });
 

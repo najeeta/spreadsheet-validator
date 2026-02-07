@@ -21,7 +21,7 @@ def _make_context(records: list[dict], **extra_state) -> MagicMock:
     ctx.state = {
         "dataframe_records": records,
         "dataframe_columns": columns,
-        "pending_fixes": [],
+        "pending_review": [],
         "artifacts": {},
         "status": "RUNNING",
         **extra_state,
@@ -91,7 +91,8 @@ class TestPackageResults:
         row_valid = SAMPLE_ROW.copy()
         row_invalid = {**SAMPLE_ROW, "employee_id": "EMP002"}
         ctx = _make_context([row_valid, row_invalid])
-        ctx.state["skipped_fixes"] = [
+        ctx.state["skipped_rows"] = [1]
+        ctx.state["all_errors"] = [
             {
                 "row_index": 1,
                 "field": "dept",
@@ -141,7 +142,8 @@ class TestPackageResults:
     def test_errors_artifact_has_errors_column(self):
         row_invalid = {**SAMPLE_ROW, "employee_id": "BAD"}
         ctx = _make_context([row_invalid])
-        ctx.state["skipped_fixes"] = [
+        ctx.state["skipped_rows"] = [0]
+        ctx.state["all_errors"] = [
             {
                 "row_index": 0,
                 "field": "employee_id",
@@ -165,7 +167,7 @@ class TestPackageResults:
         """
         ctx = _make_context([SAMPLE_ROW.copy()])
         ctx.state["status"] = "WAITING_FOR_USER"
-        ctx.state["pending_fixes"] = [
+        ctx.state["pending_review"] = [
             {"row_index": 0, "field": "dept", "current_value": "Bad", "error_message": "Invalid"}
         ]
 
@@ -178,11 +180,11 @@ class TestPackageResults:
         # No artifacts should be created
         assert ctx.state["artifacts"] == {}
 
-    def test_rejects_when_pending_fixes_exist(self):
-        """Guard: package_results must reject if pending_fixes are non-empty even if status is not WAITING_FOR_USER."""
+    def test_rejects_when_pending_review_exist(self):
+        """Guard: package_results must reject if pending_review are non-empty even if status is not WAITING_FOR_USER."""
         ctx = _make_context([SAMPLE_ROW.copy()])
         ctx.state["status"] = "RUNNING"
-        ctx.state["pending_fixes"] = [
+        ctx.state["pending_review"] = [
             {"row_index": 0, "field": "dept", "current_value": "Bad", "error_message": "Invalid"}
         ]
 
@@ -199,7 +201,8 @@ class TestPackageWithSkippedFixes:
         row_valid = SAMPLE_ROW.copy()
         row_skipped = {**SAMPLE_ROW, "employee_id": "EMP002"}
         ctx = _make_context([row_valid, row_skipped])
-        ctx.state["skipped_fixes"] = [
+        ctx.state["skipped_rows"] = [1]
+        ctx.state["all_errors"] = [
             {
                 "row_index": 1,
                 "field": "dept",
@@ -222,7 +225,8 @@ class TestPackageWithSkippedFixes:
 
     def test_no_skipped_fixes_all_valid(self):
         ctx = _make_context([SAMPLE_ROW.copy()])
-        ctx.state["skipped_fixes"] = []
+        ctx.state["skipped_rows"] = []
+        ctx.state["all_errors"] = []
         result = package_results(ctx)
         assert result["valid_count"] == 1
         assert result["error_count"] == 0

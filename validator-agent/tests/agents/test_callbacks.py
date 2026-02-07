@@ -21,7 +21,7 @@ class TestOnBeforeAgent:
         assert "status" not in ctx.state
         assert ctx.state["dataframe_records"] == []
         assert ctx.state["dataframe_columns"] == []
-        assert ctx.state["pending_fixes"] == []
+        assert ctx.state["pending_review"] == []
         assert ctx.state["artifacts"] == {}
 
     def test_preserves_existing_values(self):

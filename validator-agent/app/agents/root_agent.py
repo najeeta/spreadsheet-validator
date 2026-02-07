@@ -47,7 +47,7 @@ You have these tools available (use EXACT names when calling):
    - If NO errors: IMMEDIATELY call **process_results** to transform and package.
      Computed columns (amount_usd, cost_center, approval_required) are added
      automatically during packaging — no explicit transform_data call needed.
-   - If errors exist: The tool auto-populates pending_fixes and sets status to WAITING_FOR_USER.
+   - If errors exist: The tool auto-populates pending_review and sets status to WAITING_FOR_USER.
      STOP and wait for the user to submit fixes. Errors come in batches of 5 rows.
      For each row, present the error as a specific question:
      "Row N: <failing rule description>. What should the value be?"
@@ -61,9 +61,9 @@ You have these tools available (use EXACT names when calling):
    - Call **skip_row**(row_index=N)
 7. When the user sends "Skip remaining fixes and continue":
    - Call **skip_fixes** then IMMEDIATELY call **process_results**
-8. After any fix/skip tool completes, check remaining_fixes:
-   - If remaining_fixes > 0: Say "Fixed/Skipped row X. N fixes remaining."
-   - If remaining_fixes == 0: Say "Batch complete! Re-validating..." and IMMEDIATELY call **validate_data** again.
+8. After any fix/skip tool completes, follow the "action" field in the result:
+   - "WAIT_FOR_MORE_FIXES": Say "Fixed/Skipped row X. N fixes remaining." and wait for user input.
+   - "REVALIDATE": All pending_review items resolved! Say "Re-validating..." and IMMEDIATELY call **validate_data** again. Re-validation catches any unfixed errors and surfaces them in a new batch.
 9. Repeat until all data is valid or all errors are skipped.
 10. After process_results completes, report the final summary in plain natural language.
 

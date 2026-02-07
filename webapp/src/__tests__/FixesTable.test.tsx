@@ -50,14 +50,14 @@ describe("FixesTable", () => {
   });
 
   it("groups fixes by row and shows row numbers", () => {
-    render(<FixesTable pendingFixes={SAMPLE_FIXES} />);
+    render(<FixesTable pendingReview={SAMPLE_FIXES} />);
     // Row numbers displayed as plain numbers (header says "Row")
     expect(screen.getByText("2")).toBeInTheDocument();
     expect(screen.getByText("5")).toBeInTheDocument();
   });
 
   it("displays error messages in sub-rows", () => {
-    render(<FixesTable pendingFixes={SAMPLE_FIXES} />);
+    render(<FixesTable pendingReview={SAMPLE_FIXES} />);
     expect(
       screen.getByText(/Invalid department 'SALES'/),
     ).toBeInTheDocument();
@@ -66,14 +66,14 @@ describe("FixesTable", () => {
   });
 
   it("displays current values", () => {
-    render(<FixesTable pendingFixes={SAMPLE_FIXES} />);
+    render(<FixesTable pendingReview={SAMPLE_FIXES} />);
     expect(screen.getByText("SALES")).toBeInTheDocument();
     expect(screen.getByText("-100")).toBeInTheDocument();
     expect(screen.getByText("XYZ")).toBeInTheDocument();
   });
 
   it("renders Fix and Skip buttons per row group via aria-labels", () => {
-    render(<FixesTable pendingFixes={SAMPLE_FIXES} />);
+    render(<FixesTable pendingReview={SAMPLE_FIXES} />);
     expect(screen.getByRole("button", { name: "Fix Row 2" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Skip Row 2" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Fix Row 5" })).toBeInTheDocument();
@@ -81,14 +81,14 @@ describe("FixesTable", () => {
   });
 
   it("renders input fields for each fix", () => {
-    render(<FixesTable pendingFixes={SAMPLE_FIXES} />);
+    render(<FixesTable pendingReview={SAMPLE_FIXES} />);
     const inputs = screen.getAllByRole("textbox");
     // 3 fixes = 3 inputs
     expect(inputs).toHaveLength(3);
   });
 
   it("skip row sends skip message", async () => {
-    render(<FixesTable pendingFixes={SAMPLE_FIXES} />);
+    render(<FixesTable pendingReview={SAMPLE_FIXES} />);
     const skipBtn = screen.getByRole("button", { name: "Skip Row 2" });
     fireEvent.click(skipBtn);
     // Wait for async
@@ -100,7 +100,7 @@ describe("FixesTable", () => {
   });
 
   it("fix row sends batch fix message with filled values", async () => {
-    render(<FixesTable pendingFixes={SAMPLE_FIXES} />);
+    render(<FixesTable pendingReview={SAMPLE_FIXES} />);
     const inputs = screen.getAllByRole("textbox");
     // Fill in the dept fix for row 2
     fireEvent.change(inputs[0], { target: { value: "ENG" } });
@@ -119,7 +119,7 @@ describe("FixesTable", () => {
   it("renders batch label with totalErrorRows", () => {
     render(
       <FixesTable
-        pendingFixes={SAMPLE_FIXES}
+        pendingReview={SAMPLE_FIXES}
         totalErrorRows={20}
       />,
     );
@@ -127,12 +127,12 @@ describe("FixesTable", () => {
   });
 
   it("renders skip all link", () => {
-    render(<FixesTable pendingFixes={SAMPLE_FIXES} />);
+    render(<FixesTable pendingReview={SAMPLE_FIXES} />);
     expect(screen.getByText("Skip all")).toBeInTheDocument();
   });
 
   it("skip all sends skip message", async () => {
-    render(<FixesTable pendingFixes={SAMPLE_FIXES} />);
+    render(<FixesTable pendingReview={SAMPLE_FIXES} />);
     const skipAll = screen.getByText("Skip all");
     fireEvent.click(skipAll);
 
@@ -148,7 +148,7 @@ describe("FixesTable", () => {
     const tenSecondsAgo = Date.now() / 1000 - 10;
     render(
       <FixesTable
-        pendingFixes={SAMPLE_FIXES}
+        pendingReview={SAMPLE_FIXES}
         waitingSince={tenSecondsAgo}
       />,
     );
@@ -161,7 +161,7 @@ describe("FixesTable", () => {
     const tenSecondsAgo = Date.now() / 1000 - 10;
     const { rerender } = render(
       <FixesTable
-        pendingFixes={SAMPLE_FIXES}
+        pendingReview={SAMPLE_FIXES}
         waitingSince={tenSecondsAgo}
       />,
     );
@@ -172,7 +172,7 @@ describe("FixesTable", () => {
     const justNow = Date.now() / 1000;
     rerender(
       <FixesTable
-        pendingFixes={SAMPLE_FIXES}
+        pendingReview={SAMPLE_FIXES}
         waitingSince={justNow}
       />,
     );
@@ -181,13 +181,13 @@ describe("FixesTable", () => {
   });
 
   it("shows header with fix count", () => {
-    render(<FixesTable pendingFixes={SAMPLE_FIXES} />);
+    render(<FixesTable pendingReview={SAMPLE_FIXES} />);
     // 3 active fixes total
     expect(screen.getByText(/Fixes Needed \(3\)/)).toBeInTheDocument();
   });
 
   it("renders table headers including Current column", () => {
-    render(<FixesTable pendingFixes={SAMPLE_FIXES} />);
+    render(<FixesTable pendingReview={SAMPLE_FIXES} />);
     expect(screen.getByText("Row")).toBeInTheDocument();
     expect(screen.getByText("Field")).toBeInTheDocument();
     expect(screen.getByText("Current")).toBeInTheDocument();

@@ -150,7 +150,7 @@ async def run_pipeline(
                     return
 
                 current_status = session.state.get("status", "")
-                if current_status in ("RUNNING", "FIXING"):
+                if current_status == "RUNNING":
                     message = Content(
                         role="user",
                         parts=[Part(text="Fixes applied. Please re-validate and continue.")],

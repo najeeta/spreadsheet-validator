@@ -12,7 +12,6 @@ from app.tools.ingestion import (
     confirm_ingestion,
     ingest_file,
     ingest_uploaded_file,
-    request_file_upload,
 )
 
 
@@ -38,14 +37,14 @@ data is loaded and ready for validation.
 3. **Confirm**: Once ingestion is successful (or if data was already loaded),
    - Call **confirm_ingestion** to verify state and transition to RUNNING.
 4. **Missing File**: If NO 'file_name' is found and NO data is loaded:
-   - Call **request_file_upload**.
+   - Inform the user that a file must be uploaded through the UI.
 
 ## Important
 - The upload endpoint saves the file as an artifact but does NOT parse it automatically anymore.
 - You MUST call `ingest_uploaded_file` to parse the artifact into state.
 - NEVER call `ingest_file` for user uploads — that tool is for local disk paths only.
 - Keep responses brief.""",
-    tools=[confirm_ingestion, request_file_upload, ingest_uploaded_file, ingest_file],
+    tools=[confirm_ingestion, ingest_uploaded_file, ingest_file],
     before_agent_callback=on_before_agent,
     before_model_callback=before_model_modifier,
     output_key="ingestion_result",

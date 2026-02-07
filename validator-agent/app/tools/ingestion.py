@@ -13,19 +13,6 @@ logger = logging.getLogger(__name__)
 ACCEPTED_FORMATS = [".csv", ".xlsx", ".xls"]
 
 
-def request_file_upload(tool_context: Any) -> dict:
-    """Signal the UI to show a file upload dialog.
-
-    Sets status to UPLOADING so the frontend renders the UploadCard.
-    """
-    tool_context.state["status"] = "UPLOADING"
-    return {
-        "status": "waiting_for_upload",
-        "accepted_formats": ACCEPTED_FORMATS,
-        "message": "Please upload a CSV or Excel spreadsheet for validation.",
-    }
-
-
 async def ingest_uploaded_file(tool_context: Any, file_name: str, header_row: int = 0) -> dict:
     """Load an uploaded file artifact, parse it, and populate session state.
 
@@ -93,11 +80,9 @@ async def ingest_uploaded_file(tool_context: Any, file_name: str, header_row: in
         state["status"] = "INGESTING"
 
         # Reset stale validation state from previous runs
-        state["pending_fixes"] = []
-        state["skipped_fixes"] = []
-        state["remaining_fixes"] = []
-        state["total_error_rows"] = 0
-        state["validation_complete"] = None
+        state["pending_review"] = []
+        state["all_errors"] = []
+        state["skipped_rows"] = []
         state["waiting_since"] = None
 
         logger.info("[INGEST] Parsed %d rows, %d columns", len(records), len(columns))
@@ -203,11 +188,9 @@ def ingest_file(tool_context: Any, file_path: str) -> dict:
     state["status"] = "RUNNING"
 
     # Reset stale validation state from previous runs
-    state["pending_fixes"] = []
-    state["skipped_fixes"] = []
-    state["remaining_fixes"] = []
-    state["total_error_rows"] = 0
-    state["validation_complete"] = None
+    state["pending_review"] = []
+    state["all_errors"] = []
+    state["skipped_rows"] = []
     state["waiting_since"] = None
 
     logger.info("Ingested %d rows, %d columns from %s", len(records), len(columns), path.name)

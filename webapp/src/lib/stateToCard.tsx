@@ -1,9 +1,8 @@
 "use client";
 
-import { ProgressCard } from "@/components/a2ui/ProgressCard";
 import { CompletionCard } from "@/components/a2ui/CompletionCard";
 import { FixesTable } from "@/components/a2ui/FixesTable";
-import { UploadCard } from "@/components/a2ui/UploadCard";
+import { ProcessingSkeleton } from "@/components/a2ui/ProcessingSkeleton";
 import type { AgentState } from "@/lib/types";
 
 /**
@@ -15,17 +14,19 @@ export function renderForState(state: AgentState): React.ReactElement | null {
   if (!state) return null;
 
   const totalRows = state.dataframe_records?.length ?? 0;
-  const pendingFixes = state.pending_fixes ?? [];
-  const skippedFixes = state.skipped_fixes ?? [];
+  const pendingReview = state.pending_review ?? [];
+  const allErrors = state.all_errors ?? [];
+  const skippedRows = state.skipped_rows ?? [];
 
-  // Count unique error rows from skipped fixes (mirrors package_results logic)
-  const skippedRowIndices = new Set(skippedFixes.map((f) => f.row_index));
+  // Count unique error rows from all_errors and skipped_rows
+  const totalErrorRows = new Set(allErrors.map((e) => e.row_index)).size;
+  const skippedRowCount = skippedRows.length;
   const errorCount =
-    pendingFixes.length > 0
-      ? pendingFixes.length
-      : skippedRowIndices.size;
+    pendingReview.length > 0
+      ? pendingReview.length
+      : skippedRowCount;
   const validCount = totalRows - errorCount;
-  const fixedCount = pendingFixes.length;
+  const fixedCount = pendingReview.length;
 
   switch (state.status) {
     case "COMPLETED":
@@ -41,35 +42,15 @@ export function renderForState(state: AgentState): React.ReactElement | null {
 
     case "TRANSFORMING":
     case "PACKAGING":
-      return (
-        <ProgressCard
-          phaseName={
-            state.status === "TRANSFORMING"
-              ? "Transforming data..."
-              : "Packaging results..."
-          }
-        />
-      );
+      return <ProcessingSkeleton />;
 
     case "WAITING_FOR_USER":
-      if (pendingFixes.length > 0) {
+      if (pendingReview.length > 0) {
         return (
           <FixesTable
-            pendingFixes={pendingFixes}
+            pendingReview={pendingReview}
             waitingSince={state.waiting_since}
-            totalErrorRows={state.total_error_rows}
-          />
-        );
-      }
-      return null;
-
-    case "FIXING":
-      if (pendingFixes.length > 0) {
-        return (
-          <FixesTable
-            pendingFixes={pendingFixes}
-            waitingSince={state.waiting_since}
-            totalErrorRows={state.total_error_rows}
+            totalErrorRows={totalErrorRows}
           />
         );
       }
@@ -78,17 +59,9 @@ export function renderForState(state: AgentState): React.ReactElement | null {
     case "VALIDATING":
       return null;
 
-    case "UPLOADING":
-      if (totalRows === 0) {
-        return <UploadCard />;
-      }
-      return <ProgressCard phaseName="Processing upload..." />;
-
     case "INGESTING":
-      return <ProgressCard phaseName="Ingesting spreadsheet..." />;
-
     case "RUNNING":
-      return null;
+      return <ProcessingSkeleton />;
 
     default:
       return null;

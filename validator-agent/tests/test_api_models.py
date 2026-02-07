@@ -96,8 +96,8 @@ class TestAnswerResponse:
     def test_valid(self):
         r = AnswerResponse(
             status="RUNNING",
-            pending_fixes_count=0,
-            remaining_fixes_count=0,
+            pending_review_count=0,
+            total_errors_remaining=0,
             skipped_count=2,
             applied_count=3,
             message="Applied 3 fixes, skipped 2 rows.",

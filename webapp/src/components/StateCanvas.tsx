@@ -22,12 +22,10 @@ import { useValidator } from "@/contexts/ValidatorContext";
 
 const STATUS_LABELS: Record<PipelineStatus, string> = {
   IDLE: "Idle",
-  UPLOADING: "Uploading",
   INGESTING: "Ingesting",
   RUNNING: "Running",
   VALIDATING: "Validating",
   WAITING_FOR_USER: "Waiting for Fix",
-  FIXING: "Applying Fix",
   TRANSFORMING: "Transforming",
   PACKAGING: "Packaging",
   COMPLETED: "Completed",
@@ -64,10 +62,10 @@ export function StateCanvas() {
   useEffect(() => {
     console.log("[StateCanvas] State updated:", {
       status: state.status,
-      pending_fixes_count: state.pending_fixes?.length ?? 0,
-      pending_fixes: state.pending_fixes,
+      pending_review_count: state.pending_review?.length ?? 0,
+      pending_review: state.pending_review,
     });
-  }, [state.status, state.pending_fixes]);
+  }, [state.status, state.pending_review]);
 
   // Local state for globals editing
   const [globals, setGlobals] = useState<RunGlobals>(state.globals ?? DEFAULT_GLOBALS);
@@ -78,12 +76,9 @@ export function StateCanvas() {
 
   const totalRows = state.dataframe_records?.length ?? 0;
   const columnCount = state.dataframe_columns?.length ?? 0;
-  const skippedRowIndices = new Set((state.skipped_fixes ?? []).map((f) => f.row_index));
-  const errorCount =
-    (state.validation_errors?.length ?? 0) > 0
-      ? state.validation_errors!.length
-      : skippedRowIndices.size;
-  const fixCount = state.pending_fixes?.length ?? 0;
+  const allErrors = state.all_errors ?? [];
+  const errorCount = new Set(allErrors.map((e) => e.row_index)).size;
+  const fixCount = state.pending_review?.length ?? 0;
   const artifactCount = Object.keys(state.artifacts ?? {}).length;
 
   // Check if ready to submit (file uploaded + globals have defaults)
@@ -143,7 +138,7 @@ export function StateCanvas() {
           <MetricPill
             icon={<UploadIcon className="h-3 w-3" />}
             label={state.file_name ?? "No file"}
-            active={state.status === "UPLOADING"}
+            active={false}
           />
           <MetricPill
             icon={<Database className="h-3 w-3" />}
@@ -152,13 +147,13 @@ export function StateCanvas() {
           />
           <MetricPill
             icon={<ShieldCheck className="h-3 w-3" />}
-            label={errorCount > 0 || state.validation_complete ? `${errorCount} errors` : "—"}
+            label={errorCount > 0 || allErrors.length > 0 ? `${errorCount} errors` : "—"}
             active={state.status === "VALIDATING"}
           />
           <MetricPill
             icon={<Wrench className="h-3 w-3" />}
             label={fixCount > 0 ? `${fixCount} fixes` : "—"}
-            active={state.status === "FIXING" || state.status === "WAITING_FOR_USER"}
+            active={state.status === "WAITING_FOR_USER"}
           />
           <MetricPill
             icon={<Package className="h-3 w-3" />}

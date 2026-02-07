@@ -27,24 +27,7 @@ vi.mock("@/contexts/ValidatorContext", () => ({
   }),
 }));
 
-import { ProgressCard } from "@/components/a2ui/ProgressCard";
 import { CompletionCard } from "@/components/a2ui/CompletionCard";
-
-describe("ProgressCard", () => {
-  it("renders phase name", () => {
-    render(<ProgressCard phaseName="Transforming data" />);
-    expect(screen.getByText(/Transforming data/)).toBeInTheDocument();
-  });
-
-  it("renders spinner", () => {
-    const { container } = render(<ProgressCard phaseName="Processing" />);
-    // Should have an animated element
-    const animated =
-      container.querySelector(".animate-spin") ||
-      container.querySelector("[role='status']");
-    expect(animated || container.innerHTML.includes("Processing")).toBeTruthy();
-  });
-});
 
 describe("CompletionCard", () => {
   it("renders summary stats", () => {

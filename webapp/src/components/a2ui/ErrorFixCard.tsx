@@ -7,10 +7,10 @@ import { TextMessage, Role } from "@copilotkit/runtime-client-gql";
 import type { FixRequest } from "@/lib/types";
 
 interface ErrorFixCardProps {
-  pendingFixes: FixRequest[];
+  pendingReview: FixRequest[];
 }
 
-export function ErrorFixCard({ pendingFixes }: ErrorFixCardProps) {
+export function ErrorFixCard({ pendingReview }: ErrorFixCardProps) {
   const { appendMessage } = useCopilotChat();
   const [fixValues, setFixValues] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState<Record<string, boolean>>({});
@@ -44,11 +44,11 @@ export function ErrorFixCard({ pendingFixes }: ErrorFixCardProps) {
       <div className="flex items-center gap-2 text-red-700">
         <AlertTriangle className="h-5 w-5" />
         <span className="font-semibold">
-          Fixes Needed ({pendingFixes.length})
+          Fixes Needed ({pendingReview.length})
         </span>
       </div>
       <div className="space-y-3 max-h-80 overflow-y-auto">
-        {pendingFixes.map((fix) => {
+        {pendingReview.map((fix) => {
           const key = fixKey(fix);
           return (
             <div

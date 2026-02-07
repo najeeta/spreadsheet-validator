@@ -18,7 +18,7 @@ against business rules.
 1. Call validate_data to check all records against 7 business rules.
 2. Return the validation result (error count, valid count, total rows).
 
-The validate_data tool automatically populates pending_fixes and sets status
+The validate_data tool automatically populates pending_review and sets status
 to WAITING_FOR_USER when errors are found. The root agent handles the HITL
 fix cycle — you do NOT need to handle fixes or interact with the user.
 

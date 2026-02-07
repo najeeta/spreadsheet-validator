@@ -1,11 +1,10 @@
-"""Tests for validation tools — updated for new business rules."""
+"""Tests for validation tools — updated for new simplified fix cycle algorithm."""
 
 from unittest.mock import MagicMock
 
+from app.fix_utils import FIX_BATCH_SIZE
 from app.tools.validation import (
-    FIX_BATCH_SIZE,
     batch_write_fixes,
-    request_user_fix,
     skip_fixes,
     skip_row,
     validate_data,
@@ -21,7 +20,9 @@ def _make_context(records: list[dict], **extra_state) -> MagicMock:
     ctx.state = {
         "dataframe_records": records,
         "dataframe_columns": columns,
-        "pending_fixes": [],
+        "pending_review": [],
+        "all_errors": [],
+        "skipped_rows": [],
         "status": "RUNNING",
         **extra_state,
     }
@@ -54,14 +55,14 @@ class TestValidateDataClean:
         validate_data(ctx)
         assert ctx.state["status"] == "VALIDATING"
 
-    def test_clears_pending_fixes(self):
+    def test_clears_pending_review_on_clean(self):
         ctx = _make_context([VALID_ROW.copy()])
         validate_data(ctx)
-        assert ctx.state["pending_fixes"] == []
+        assert ctx.state["pending_review"] == []
 
 
 class TestValidateDataAutoPopulatesFixes:
-    """validate_data auto-populates pending_fixes when errors found."""
+    """validate_data auto-populates pending_review when errors found."""
 
     def test_sets_waiting_for_user_on_errors(self):
         row = {**VALID_ROW, "dept": "InvalidDept"}
@@ -81,7 +82,7 @@ class TestValidateDataAutoPopulatesFixes:
         assert result["status"] == "waiting_for_fixes"
         assert "STOP" in result["action"]
         assert "process_results" in result["action"]
-        assert result["pending_fixes_count"] >= 1
+        assert result["pending_review_count"] >= 1
 
     def test_returns_success_with_proceed_action_when_valid(self):
         """Return value must indicate proceed when no errors exist."""
@@ -91,12 +92,12 @@ class TestValidateDataAutoPopulatesFixes:
         assert "Proceed" in result["action"]
         assert result["error_count"] == 0
 
-    def test_populates_pending_fixes_from_errors(self):
+    def test_populates_pending_review_from_errors(self):
         row = {**VALID_ROW, "dept": "InvalidDept"}
         ctx = _make_context([row])
         validate_data(ctx)
-        assert len(ctx.state["pending_fixes"]) == 1
-        fix = ctx.state["pending_fixes"][0]
+        assert len(ctx.state["pending_review"]) == 1
+        fix = ctx.state["pending_review"][0]
         assert fix["row_index"] == 0
         assert fix["field"] == "dept"
         assert fix["current_value"] == "InvalidDept"
@@ -106,7 +107,7 @@ class TestValidateDataAutoPopulatesFixes:
         row = {**VALID_ROW, "dept": "Bad", "amount": -50}
         ctx = _make_context([row])
         validate_data(ctx)
-        fixes = ctx.state["pending_fixes"]
+        fixes = ctx.state["pending_review"]
         fields = {f["field"] for f in fixes}
         assert "dept" in fields
         assert "amount" in fields
@@ -118,7 +119,7 @@ class TestValidateDataAutoPopulatesFixes:
         ]
         ctx = _make_context(rows)
         validate_data(ctx)
-        fixes = ctx.state["pending_fixes"]
+        fixes = ctx.state["pending_review"]
         row_indices = {f["row_index"] for f in fixes}
         assert 0 in row_indices
         assert 1 in row_indices
@@ -141,7 +142,7 @@ class TestValidateDataEmployeeId:
         ctx = _make_context([row])
         result = validate_data(ctx)
         assert result["error_count"] > 0
-        fixes = ctx.state["pending_fixes"]
+        fixes = ctx.state["pending_review"]
         emp_errors = [f for f in fixes if f["field"] == "employee_id"]
         assert len(emp_errors) > 0
 
@@ -196,7 +197,7 @@ class TestValidateDataDuplicatePair:
         ctx = _make_context(rows)
         result = validate_data(ctx)
         assert result["error_count"] == 1  # Only second row has error
-        fixes = ctx.state["pending_fixes"]
+        fixes = ctx.state["pending_review"]
         dup_errors = [f for f in fixes if "Duplicate" in f["error_message"]]
         assert len(dup_errors) == 1
         assert dup_errors[0]["row_index"] == 1
@@ -353,36 +354,13 @@ class TestValidateDataCFOApproval:
             assert result["error_count"] == 0, f"{dept} with high amount should be valid"
 
 
-class TestRequestUserFix:
-    """request_user_fix appends to pending_fixes and sets status."""
-
-    def test_appends_fix_request(self):
-        ctx = _make_context([VALID_ROW.copy()])
-        request_user_fix(
-            ctx,
-            row_index=0,
-            field="dept",
-            current_value="InvalidDept",
-            error_message="Invalid department",
-        )
-        assert len(ctx.state["pending_fixes"]) == 1
-        fix = ctx.state["pending_fixes"][0]
-        assert fix["row_index"] == 0
-        assert fix["field"] == "dept"
-
-    def test_sets_waiting_for_user_status(self):
-        ctx = _make_context([VALID_ROW.copy()])
-        request_user_fix(ctx, row_index=0, field="dept", current_value="X", error_message="Bad")
-        assert ctx.state["status"] == "WAITING_FOR_USER"
-
-
 class TestWriteFix:
-    """write_fix updates the record and removes from pending_fixes."""
+    """write_fix updates the record and removes from pending_review."""
 
     def test_updates_record_value(self):
         row = {**VALID_ROW, "dept": "InvalidDept"}
         ctx = _make_context([row])
-        ctx.state["pending_fixes"] = [
+        errors = [
             {
                 "row_index": 0,
                 "field": "dept",
@@ -390,13 +368,15 @@ class TestWriteFix:
                 "error_message": "Bad",
             }
         ]
+        ctx.state["pending_review"] = list(errors)
+        ctx.state["all_errors"] = list(errors)
         write_fix(ctx, row_index=0, field="dept", new_value="ENG")
         assert ctx.state["dataframe_records"][0]["dept"] == "ENG"
 
-    def test_removes_from_pending_fixes(self):
+    def test_removes_from_pending_review(self):
         row = {**VALID_ROW, "dept": "InvalidDept"}
         ctx = _make_context([row])
-        ctx.state["pending_fixes"] = [
+        errors = [
             {
                 "row_index": 0,
                 "field": "dept",
@@ -404,13 +384,15 @@ class TestWriteFix:
                 "error_message": "Bad",
             }
         ]
+        ctx.state["pending_review"] = list(errors)
+        ctx.state["all_errors"] = list(errors)
         write_fix(ctx, row_index=0, field="dept", new_value="ENG")
-        assert len(ctx.state["pending_fixes"]) == 0
+        assert len(ctx.state["pending_review"]) == 0
 
     def test_sets_running_when_no_more_fixes(self):
         row = {**VALID_ROW, "dept": "InvalidDept"}
         ctx = _make_context([row])
-        ctx.state["pending_fixes"] = [
+        errors = [
             {
                 "row_index": 0,
                 "field": "dept",
@@ -418,25 +400,63 @@ class TestWriteFix:
                 "error_message": "Bad",
             }
         ]
+        ctx.state["pending_review"] = list(errors)
+        ctx.state["all_errors"] = list(errors)
         ctx.state["status"] = "WAITING_FOR_USER"
         write_fix(ctx, row_index=0, field="dept", new_value="ENG")
         assert ctx.state["status"] == "RUNNING"
 
-    def test_stays_fixing_with_remaining_fixes(self):
-        row = {**VALID_ROW, "dept": "InvalidDept"}
+    def test_pops_entire_row_even_with_partial_fix(self):
+        """Pop-based: fixing one field pops the entire row. Re-validation catches remaining."""
+        row = {**VALID_ROW, "dept": "InvalidDept", "amount": -1}
         ctx = _make_context([row])
-        ctx.state["pending_fixes"] = [
+        errors = [
             {
                 "row_index": 0,
                 "field": "dept",
                 "current_value": "InvalidDept",
                 "error_message": "Bad dept",
             },
-            {"row_index": 0, "field": "amount", "current_value": -1, "error_message": "Bad amount"},
+            {
+                "row_index": 0,
+                "field": "amount",
+                "current_value": "-1",
+                "error_message": "Bad amount",
+            },
         ]
+        ctx.state["pending_review"] = list(errors)
+        ctx.state["all_errors"] = list(errors)
         ctx.state["status"] = "WAITING_FOR_USER"
         write_fix(ctx, row_index=0, field="dept", new_value="ENG")
-        assert ctx.state["status"] == "FIXING"
+        # Entire row is popped — status transitions to RUNNING for re-validation
+        assert ctx.state["status"] == "RUNNING"
+
+    def test_stays_waiting_when_other_rows_remain(self):
+        """Pop-based: fixing one row leaves other rows in pending_review."""
+        rows = [
+            {**VALID_ROW, "dept": "InvalidDept"},
+            {**VALID_ROW, "employee_id": "EMP002", "vendor": "", "spend_date": "2024-01-16"},
+        ]
+        ctx = _make_context(rows)
+        errors = [
+            {
+                "row_index": 0,
+                "field": "dept",
+                "current_value": "InvalidDept",
+                "error_message": "Bad dept",
+            },
+            {
+                "row_index": 1,
+                "field": "vendor",
+                "current_value": "",
+                "error_message": "Empty",
+            },
+        ]
+        ctx.state["pending_review"] = list(errors)
+        ctx.state["all_errors"] = list(errors)
+        ctx.state["status"] = "WAITING_FOR_USER"
+        write_fix(ctx, row_index=0, field="dept", new_value="ENG")
+        assert ctx.state["status"] == "WAITING_FOR_USER"
 
 
 class TestIncrementalValidation:
@@ -473,7 +493,7 @@ class TestIncrementalValidation:
         result1 = validate_data(ctx)
         assert result1["error_count"] == 1
 
-        # Apply fix
+        # Apply fix — need all_errors set by validate_data
         write_fix(ctx, row_index=0, field="dept", new_value="ENG")
 
         # Second validation - row should be revalidated (not skipped)
@@ -527,7 +547,7 @@ class TestIncrementalValidation:
         ctx = _make_context([row])
         ctx.state["row_fingerprints"] = compute_all_fingerprints([row])
         ctx.state["validated_row_fingerprints"] = {}
-        ctx.state["pending_fixes"] = [
+        errors = [
             {
                 "row_index": 0,
                 "field": "dept",
@@ -535,6 +555,8 @@ class TestIncrementalValidation:
                 "error_message": "Bad",
             }
         ]
+        ctx.state["pending_review"] = list(errors)
+        ctx.state["all_errors"] = list(errors)
 
         old_fp = ctx.state["row_fingerprints"][0]
 
@@ -551,7 +573,7 @@ class TestIncrementalValidation:
         fps = compute_all_fingerprints([row])
         ctx.state["row_fingerprints"] = fps
         ctx.state["validated_row_fingerprints"] = {fps[0]: False}  # Was invalid
-        ctx.state["pending_fixes"] = [
+        errors = [
             {
                 "row_index": 0,
                 "field": "dept",
@@ -559,6 +581,8 @@ class TestIncrementalValidation:
                 "error_message": "Bad",
             }
         ]
+        ctx.state["pending_review"] = list(errors)
+        ctx.state["all_errors"] = list(errors)
 
         old_fp = fps[0]
         write_fix(ctx, row_index=0, field="dept", new_value="ENG")
@@ -615,7 +639,7 @@ class TestIncrementalValidation:
 
 
 class TestValidateDataBatching:
-    """validate_data caps pending_fixes at FIX_BATCH_SIZE rows and sets total_error_rows."""
+    """validate_data caps pending_review at FIX_BATCH_SIZE rows and populates all_errors."""
 
     def _make_error_rows(self, count):
         """Create count invalid rows (each with bad dept)."""
@@ -632,21 +656,21 @@ class TestValidateDataBatching:
         return rows
 
     def test_caps_at_batch_size(self):
-        """When more than FIX_BATCH_SIZE error rows exist, only batch is in pending_fixes."""
+        """When more than FIX_BATCH_SIZE error rows exist, only batch is in pending_review."""
         rows = self._make_error_rows(10)
         ctx = _make_context(rows)
         validate_data(ctx)
-        # pending_fixes should only contain fixes for FIX_BATCH_SIZE rows
-        row_indices = {f["row_index"] for f in ctx.state["pending_fixes"]}
+        # pending_review should only contain fixes for FIX_BATCH_SIZE rows
+        row_indices = {f["row_index"] for f in ctx.state["pending_review"]}
         assert len(row_indices) <= FIX_BATCH_SIZE
 
-    def test_sets_total_error_rows(self):
-        """total_error_rows reflects the real total, not just the batch."""
+    def test_all_errors_has_all_error_rows(self):
+        """all_errors reflects the real total, not just the batch."""
         rows = self._make_error_rows(10)
         ctx = _make_context(rows)
-        result = validate_data(ctx)
-        assert ctx.state["total_error_rows"] == 10
-        assert result["total_error_rows"] == 10
+        validate_data(ctx)
+        all_error_rows = {e["row_index"] for e in ctx.state["all_errors"]}
+        assert len(all_error_rows) == 10
 
     def test_batch_size_return_value(self):
         """Return dict includes batch_size."""
@@ -656,25 +680,23 @@ class TestValidateDataBatching:
         assert result["batch_size"] == FIX_BATCH_SIZE
 
     def test_fewer_errors_than_batch(self):
-        """When fewer error rows than batch size, all are in pending_fixes."""
+        """When fewer error rows than batch size, all are in pending_review."""
         rows = self._make_error_rows(3)
         ctx = _make_context(rows)
         result = validate_data(ctx)
-        row_indices = {f["row_index"] for f in ctx.state["pending_fixes"]}
+        row_indices = {f["row_index"] for f in ctx.state["pending_review"]}
         assert len(row_indices) == 3
         assert result["batch_size"] == 3
 
-    def test_skips_skipped_fixes_rows_on_revalidation(self):
-        """Rows in skipped_fixes are excluded from re-validation."""
+    def test_skips_skipped_rows_on_revalidation(self):
+        """Rows in skipped_rows are excluded from re-validation."""
         rows = self._make_error_rows(3)
         ctx = _make_context(rows)
         # Simulate row 0 already skipped
-        ctx.state["skipped_fixes"] = [
-            {"row_index": 0, "field": "dept", "current_value": "BAD0", "error_message": "Bad"}
-        ]
+        ctx.state["skipped_rows"] = [0]
         result = validate_data(ctx)
-        # Row 0 should not appear in pending_fixes
-        row_indices = {f["row_index"] for f in ctx.state["pending_fixes"]}
+        # Row 0 should not appear in pending_review
+        row_indices = {f["row_index"] for f in ctx.state["pending_review"]}
         assert 0 not in row_indices
         # Skipped count should include the 1 skipped row
         assert result["skipped_unchanged"] >= 1
@@ -703,13 +725,18 @@ class TestWaitingSinceResetPerFix:
     """waiting_since resets after each fix/skip when pending fixes remain."""
 
     def test_write_fix_resets_waiting_since_when_pending_remain(self):
-        """write_fix should reset waiting_since when there are still pending fixes."""
-        row = {**VALID_ROW, "dept": "BAD", "vendor": ""}
-        ctx = _make_context([row])
-        ctx.state["pending_fixes"] = [
-            {"row_index": 0, "field": "dept", "current_value": "BAD", "error_message": "Bad dept"},
-            {"row_index": 0, "field": "vendor", "current_value": "", "error_message": "Empty"},
+        """write_fix should reset waiting_since when other rows remain in review."""
+        rows = [
+            {**VALID_ROW, "dept": "BAD"},
+            {**VALID_ROW, "employee_id": "EMP002", "vendor": "", "spend_date": "2024-01-16"},
         ]
+        ctx = _make_context(rows)
+        errors = [
+            {"row_index": 0, "field": "dept", "current_value": "BAD", "error_message": "Bad dept"},
+            {"row_index": 1, "field": "vendor", "current_value": "", "error_message": "Empty"},
+        ]
+        ctx.state["pending_review"] = list(errors)
+        ctx.state["all_errors"] = list(errors)
         ctx.state["waiting_since"] = 1000.0  # Old timestamp
         ctx.state["status"] = "WAITING_FOR_USER"
 
@@ -720,31 +747,35 @@ class TestWaitingSinceResetPerFix:
         assert ctx.state["waiting_since"] > 1000.0
 
     def test_write_fix_does_not_set_waiting_since_when_no_pending(self):
-        """write_fix should not set waiting_since when all fixes are resolved."""
+        """write_fix should clear waiting_since when all fixes are resolved."""
         row = {**VALID_ROW, "dept": "BAD"}
         ctx = _make_context([row])
-        ctx.state["pending_fixes"] = [
+        errors = [
             {"row_index": 0, "field": "dept", "current_value": "BAD", "error_message": "Bad dept"},
         ]
+        ctx.state["pending_review"] = list(errors)
+        ctx.state["all_errors"] = list(errors)
         ctx.state["waiting_since"] = 1000.0
         ctx.state["status"] = "WAITING_FOR_USER"
 
         write_fix(ctx, row_index=0, field="dept", new_value="ENG")
 
-        # No pending fixes remain, so waiting_since should NOT be updated
-        assert ctx.state["waiting_since"] == 1000.0
+        # No pending review items remain, _pop_from_review sets waiting_since = None
+        assert ctx.state["waiting_since"] is None
 
     def test_batch_write_fixes_resets_waiting_since_when_pending_remain(self):
-        """batch_write_fixes should reset waiting_since when pending fixes remain."""
+        """batch_write_fixes should reset waiting_since when other rows remain in review."""
         rows = [
             {**VALID_ROW, "dept": "BAD"},
             {**VALID_ROW, "employee_id": "EMP002", "vendor": "", "spend_date": "2024-01-16"},
         ]
         ctx = _make_context(rows)
-        ctx.state["pending_fixes"] = [
+        errors = [
             {"row_index": 0, "field": "dept", "current_value": "BAD", "error_message": "Bad dept"},
             {"row_index": 1, "field": "vendor", "current_value": "", "error_message": "Empty"},
         ]
+        ctx.state["pending_review"] = list(errors)
+        ctx.state["all_errors"] = list(errors)
         ctx.state["row_fingerprints"] = compute_all_fingerprints(rows)
         ctx.state["validated_row_fingerprints"] = {}
         ctx.state["waiting_since"] = 1000.0
@@ -756,28 +787,37 @@ class TestWaitingSinceResetPerFix:
         assert ctx.state["waiting_since"] > 1000.0
 
     def test_batch_write_fixes_does_not_set_waiting_since_when_no_pending(self):
-        """batch_write_fixes should not set waiting_since when all fixes resolved."""
+        """batch_write_fixes should clear waiting_since when all review items resolved."""
         row = {**VALID_ROW, "dept": "BAD"}
         ctx = _make_context([row])
-        ctx.state["pending_fixes"] = [
+        errors = [
             {"row_index": 0, "field": "dept", "current_value": "BAD", "error_message": "Bad"},
         ]
+        ctx.state["pending_review"] = list(errors)
+        ctx.state["all_errors"] = list(errors)
         ctx.state["row_fingerprints"] = compute_all_fingerprints([row])
         ctx.state["validated_row_fingerprints"] = {}
         ctx.state["waiting_since"] = 1000.0
 
         batch_write_fixes(ctx, row_index=0, fixes={"dept": "ENG"})
 
-        assert ctx.state["waiting_since"] == 1000.0
+        # No pending review items remain, _pop_from_review sets waiting_since = None
+        assert ctx.state["waiting_since"] is None
 
     def test_skip_row_resets_waiting_since_when_pending_remain(self):
         """skip_row should reset waiting_since when pending fixes remain."""
-        ctx = _make_context([{**VALID_ROW, "dept": "BAD"}, {**VALID_ROW, "vendor": ""}])
-        ctx.state["pending_fixes"] = [
+        rows = [
+            {**VALID_ROW, "dept": "BAD"},
+            {**VALID_ROW, "employee_id": "EMP002", "vendor": "", "spend_date": "2024-01-16"},
+        ]
+        ctx = _make_context(rows)
+        errors = [
             {"row_index": 0, "field": "dept", "current_value": "BAD", "error_message": "Bad dept"},
             {"row_index": 1, "field": "vendor", "current_value": "", "error_message": "Empty"},
         ]
-        ctx.state["skipped_fixes"] = []
+        ctx.state["pending_review"] = list(errors)
+        ctx.state["all_errors"] = list(errors)
+        ctx.state["skipped_rows"] = []
         ctx.state["waiting_since"] = 1000.0
         ctx.state["status"] = "WAITING_FOR_USER"
 
@@ -787,37 +827,46 @@ class TestWaitingSinceResetPerFix:
         assert ctx.state["waiting_since"] > 1000.0
 
     def test_skip_row_does_not_set_waiting_since_when_no_pending(self):
-        """skip_row should not set waiting_since when all fixes are resolved."""
+        """skip_row should clear waiting_since when all fixes are resolved."""
         ctx = _make_context([{**VALID_ROW, "dept": "BAD"}])
-        ctx.state["pending_fixes"] = [
+        errors = [
             {"row_index": 0, "field": "dept", "current_value": "BAD", "error_message": "Bad"},
         ]
-        ctx.state["skipped_fixes"] = []
+        ctx.state["pending_review"] = list(errors)
+        ctx.state["all_errors"] = list(errors)
+        ctx.state["skipped_rows"] = []
         ctx.state["waiting_since"] = 1000.0
 
         skip_row(ctx, row_index=0)
 
-        assert ctx.state["waiting_since"] == 1000.0
+        # No pending review items remain, _pop_from_review sets waiting_since = None
+        assert ctx.state["waiting_since"] is None
 
 
 class TestSkipRow:
-    """skip_row moves fixes from pending_fixes to skipped_fixes."""
+    """skip_row adds row index to skipped_rows and pops from pending_review."""
 
-    def test_moves_to_skipped_fixes(self):
+    def test_moves_to_skipped_rows(self):
         ctx = _make_context([{**VALID_ROW, "dept": "BAD"}])
-        ctx.state["pending_fixes"] = [
+        errors = [
             {"row_index": 0, "field": "dept", "current_value": "BAD", "error_message": "Invalid"},
         ]
-        ctx.state["skipped_fixes"] = []
+        ctx.state["pending_review"] = list(errors)
+        ctx.state["all_errors"] = list(errors)
+        ctx.state["skipped_rows"] = []
         result = skip_row(ctx, row_index=0)
         assert result["status"] == "skipped"
-        assert len(ctx.state["pending_fixes"]) == 0
-        assert len(ctx.state["skipped_fixes"]) == 1
-        assert ctx.state["skipped_fixes"][0]["row_index"] == 0
+        assert len(ctx.state["pending_review"]) == 0
+        assert 0 in ctx.state["skipped_rows"]
 
     def test_removes_only_target_row(self):
-        ctx = _make_context([{**VALID_ROW, "dept": "BAD"}, {**VALID_ROW, "vendor": ""}])
-        ctx.state["pending_fixes"] = [
+        ctx = _make_context(
+            [
+                {**VALID_ROW, "dept": "BAD"},
+                {**VALID_ROW, "employee_id": "EMP002", "vendor": "", "spend_date": "2024-01-16"},
+            ]
+        )
+        errors = [
             {
                 "row_index": 0,
                 "field": "dept",
@@ -831,43 +880,56 @@ class TestSkipRow:
                 "error_message": "Empty vendor",
             },
         ]
-        ctx.state["skipped_fixes"] = []
+        ctx.state["pending_review"] = list(errors)
+        ctx.state["all_errors"] = list(errors)
+        ctx.state["skipped_rows"] = []
         result = skip_row(ctx, row_index=0)
         assert result["remaining_fixes"] == 1
-        assert len(ctx.state["pending_fixes"]) == 1
-        assert ctx.state["pending_fixes"][0]["row_index"] == 1
+        assert 0 in ctx.state["skipped_rows"]
+        assert len(ctx.state["pending_review"]) == 1
+        assert ctx.state["pending_review"][0]["row_index"] == 1
 
     def test_no_op_for_unknown_row(self):
         ctx = _make_context([VALID_ROW.copy()])
-        ctx.state["pending_fixes"] = []
-        ctx.state["skipped_fixes"] = []
+        ctx.state["pending_review"] = []
+        ctx.state["all_errors"] = []
+        ctx.state["skipped_rows"] = []
         result = skip_row(ctx, row_index=99)
         assert result["status"] == "no_op"
 
     def test_status_running_when_no_pending(self):
         ctx = _make_context([{**VALID_ROW, "dept": "BAD"}])
-        ctx.state["pending_fixes"] = [
+        errors = [
             {"row_index": 0, "field": "dept", "current_value": "BAD", "error_message": "Invalid"},
         ]
-        ctx.state["skipped_fixes"] = []
+        ctx.state["pending_review"] = list(errors)
+        ctx.state["all_errors"] = list(errors)
+        ctx.state["skipped_rows"] = []
         ctx.state["status"] = "WAITING_FOR_USER"
         skip_row(ctx, row_index=0)
         assert ctx.state["status"] == "RUNNING"
 
-    def test_status_fixing_when_pending_remain(self):
-        ctx = _make_context([{**VALID_ROW, "dept": "BAD"}, {**VALID_ROW, "vendor": ""}])
-        ctx.state["pending_fixes"] = [
+    def test_status_waiting_for_user_when_pending_remain(self):
+        ctx = _make_context(
+            [
+                {**VALID_ROW, "dept": "BAD"},
+                {**VALID_ROW, "employee_id": "EMP002", "vendor": "", "spend_date": "2024-01-16"},
+            ]
+        )
+        errors = [
             {"row_index": 0, "field": "dept", "current_value": "BAD", "error_message": "Bad dept"},
             {"row_index": 1, "field": "vendor", "current_value": "", "error_message": "Empty"},
         ]
-        ctx.state["skipped_fixes"] = []
+        ctx.state["pending_review"] = list(errors)
+        ctx.state["all_errors"] = list(errors)
+        ctx.state["skipped_rows"] = []
         skip_row(ctx, row_index=0)
-        assert ctx.state["status"] == "FIXING"
+        assert ctx.state["status"] == "WAITING_FOR_USER"
 
     def test_multiple_fixes_per_row(self):
-        """All fixes for a row are moved to skipped_fixes."""
+        """All fixes for a row are excluded when that row is skipped."""
         ctx = _make_context([{**VALID_ROW, "dept": "BAD", "vendor": ""}])
-        ctx.state["pending_fixes"] = [
+        errors = [
             {"row_index": 0, "field": "dept", "current_value": "BAD", "error_message": "Bad dept"},
             {
                 "row_index": 0,
@@ -876,89 +938,98 @@ class TestSkipRow:
                 "error_message": "Empty vendor",
             },
         ]
-        ctx.state["skipped_fixes"] = []
+        ctx.state["pending_review"] = list(errors)
+        ctx.state["all_errors"] = list(errors)
+        ctx.state["skipped_rows"] = []
         result = skip_row(ctx, row_index=0)
-        assert len(ctx.state["skipped_fixes"]) == 2
+        assert 0 in ctx.state["skipped_rows"]
         assert result["remaining_fixes"] == 0
 
 
 class TestSkipFixes:
-    """skip_fixes moves ALL pending to skipped_fixes."""
+    """skip_fixes moves ALL pending error rows to skipped_rows."""
 
     def test_moves_all_to_skipped(self):
-        ctx = _make_context([{**VALID_ROW, "dept": "BAD"}])
-        ctx.state["pending_fixes"] = [
+        rows = [
+            {**VALID_ROW, "dept": "BAD"},
+            {**VALID_ROW, "employee_id": "EMP002", "vendor": "", "spend_date": "2024-01-16"},
+        ]
+        ctx = _make_context(rows)
+        errors = [
             {"row_index": 0, "field": "dept", "current_value": "BAD", "error_message": "Invalid"},
             {"row_index": 1, "field": "vendor", "current_value": "", "error_message": "Empty"},
         ]
-        ctx.state["skipped_fixes"] = []
+        ctx.state["pending_review"] = list(errors)
+        ctx.state["all_errors"] = list(errors)
+        ctx.state["skipped_rows"] = []
         result = skip_fixes(ctx)
         assert result["status"] == "skipped"
-        assert result["skipped_count"] == 2
-        assert len(ctx.state["pending_fixes"]) == 0
-        assert len(ctx.state["skipped_fixes"]) == 2
+        assert result["skipped_count"] == 2  # 2 unique row indices
+        assert len(ctx.state["pending_review"]) == 0
+        assert 0 in ctx.state["skipped_rows"]
+        assert 1 in ctx.state["skipped_rows"]
 
     def test_clears_pending(self):
-        ctx = _make_context([VALID_ROW.copy()])
-        ctx.state["pending_fixes"] = [
-            {"row_index": 0, "field": "dept", "current_value": "X", "error_message": "Bad"},
+        ctx = _make_context([{**VALID_ROW, "dept": "BAD"}])
+        errors = [
+            {"row_index": 0, "field": "dept", "current_value": "BAD", "error_message": "Bad"},
         ]
-        ctx.state["skipped_fixes"] = []
+        ctx.state["pending_review"] = list(errors)
+        ctx.state["all_errors"] = list(errors)
+        ctx.state["skipped_rows"] = []
         skip_fixes(ctx)
-        assert ctx.state["pending_fixes"] == []
+        assert ctx.state["pending_review"] == []
 
     def test_sets_status_running(self):
-        ctx = _make_context([VALID_ROW.copy()])
-        ctx.state["pending_fixes"] = [
-            {"row_index": 0, "field": "dept", "current_value": "X", "error_message": "Bad"},
+        ctx = _make_context([{**VALID_ROW, "dept": "BAD"}])
+        errors = [
+            {"row_index": 0, "field": "dept", "current_value": "BAD", "error_message": "Bad"},
         ]
-        ctx.state["skipped_fixes"] = []
+        ctx.state["pending_review"] = list(errors)
+        ctx.state["all_errors"] = list(errors)
+        ctx.state["skipped_rows"] = []
         ctx.state["status"] = "WAITING_FOR_USER"
         skip_fixes(ctx)
         assert ctx.state["status"] == "RUNNING"
 
-    def test_sets_validation_complete(self):
-        ctx = _make_context([VALID_ROW.copy()])
-        ctx.state["pending_fixes"] = [
-            {"row_index": 0, "field": "dept", "current_value": "X", "error_message": "Bad"},
-        ]
-        ctx.state["skipped_fixes"] = []
-        skip_fixes(ctx)
-        assert ctx.state["validation_complete"] is True
-
     def test_clears_waiting_since(self):
-        ctx = _make_context([VALID_ROW.copy()])
-        ctx.state["pending_fixes"] = [
-            {"row_index": 0, "field": "dept", "current_value": "X", "error_message": "Bad"},
+        ctx = _make_context([{**VALID_ROW, "dept": "BAD"}])
+        errors = [
+            {"row_index": 0, "field": "dept", "current_value": "BAD", "error_message": "Bad"},
         ]
-        ctx.state["skipped_fixes"] = []
+        ctx.state["pending_review"] = list(errors)
+        ctx.state["all_errors"] = list(errors)
+        ctx.state["skipped_rows"] = []
         ctx.state["waiting_since"] = 12345.0
         skip_fixes(ctx)
         assert ctx.state["waiting_since"] is None
 
     def test_no_op_when_empty(self):
         ctx = _make_context([VALID_ROW.copy()])
-        ctx.state["pending_fixes"] = []
-        ctx.state["skipped_fixes"] = []
+        ctx.state["pending_review"] = []
+        ctx.state["all_errors"] = []
+        ctx.state["skipped_rows"] = []
         result = skip_fixes(ctx)
         assert result["status"] == "no_op"
 
     def test_appends_to_existing_skipped(self):
-        """Existing skipped_fixes are preserved when new ones are added."""
-        ctx = _make_context([VALID_ROW.copy()])
-        ctx.state["skipped_fixes"] = [
-            {
-                "row_index": 0,
-                "field": "dept",
-                "current_value": "X",
-                "error_message": "Already skipped",
-            },
+        """Existing skipped_rows are preserved when new ones are added."""
+        rows = [
+            {**VALID_ROW, "dept": "BAD"},
+            {**VALID_ROW, "employee_id": "EMP002", "vendor": "", "spend_date": "2024-01-16"},
         ]
-        ctx.state["pending_fixes"] = [
+        ctx = _make_context(rows)
+        ctx.state["skipped_rows"] = [5]  # Pre-existing skipped row
+        errors = [
+            {"row_index": 0, "field": "dept", "current_value": "BAD", "error_message": "Bad"},
             {"row_index": 1, "field": "vendor", "current_value": "", "error_message": "Empty"},
         ]
+        ctx.state["pending_review"] = list(errors)
+        ctx.state["all_errors"] = list(errors)
         skip_fixes(ctx)
-        assert len(ctx.state["skipped_fixes"]) == 2
+        assert 5 in ctx.state["skipped_rows"]
+        assert 0 in ctx.state["skipped_rows"]
+        assert 1 in ctx.state["skipped_rows"]
 
 
 class TestBatchWriteFixes:
@@ -967,10 +1038,12 @@ class TestBatchWriteFixes:
     def test_applies_multiple_fields(self):
         row = {**VALID_ROW, "dept": "BAD", "vendor": ""}
         ctx = _make_context([row])
-        ctx.state["pending_fixes"] = [
+        errors = [
             {"row_index": 0, "field": "dept", "current_value": "BAD", "error_message": "Bad dept"},
             {"row_index": 0, "field": "vendor", "current_value": "", "error_message": "Empty"},
         ]
+        ctx.state["pending_review"] = list(errors)
+        ctx.state["all_errors"] = list(errors)
         ctx.state["row_fingerprints"] = compute_all_fingerprints([row])
         ctx.state["validated_row_fingerprints"] = {}
 
@@ -982,16 +1055,18 @@ class TestBatchWriteFixes:
     def test_removes_matching_pending(self):
         row = {**VALID_ROW, "dept": "BAD", "vendor": ""}
         ctx = _make_context([row])
-        ctx.state["pending_fixes"] = [
+        errors = [
             {"row_index": 0, "field": "dept", "current_value": "BAD", "error_message": "Bad dept"},
             {"row_index": 0, "field": "vendor", "current_value": "", "error_message": "Empty"},
         ]
+        ctx.state["pending_review"] = list(errors)
+        ctx.state["all_errors"] = list(errors)
         ctx.state["row_fingerprints"] = compute_all_fingerprints([row])
         ctx.state["validated_row_fingerprints"] = {}
 
         result = batch_write_fixes(ctx, row_index=0, fixes={"dept": "ENG", "vendor": "Acme"})
         assert result["remaining_fixes"] == 0
-        assert len(ctx.state["pending_fixes"]) == 0
+        assert len(ctx.state["pending_review"]) == 0
 
     def test_updates_fingerprint(self):
         row = {**VALID_ROW, "dept": "BAD"}
@@ -999,9 +1074,11 @@ class TestBatchWriteFixes:
         fps = compute_all_fingerprints([row])
         ctx.state["row_fingerprints"] = fps
         ctx.state["validated_row_fingerprints"] = {fps[0]: False}
-        ctx.state["pending_fixes"] = [
+        errors = [
             {"row_index": 0, "field": "dept", "current_value": "BAD", "error_message": "Bad"},
         ]
+        ctx.state["pending_review"] = list(errors)
+        ctx.state["all_errors"] = list(errors)
         old_fp = fps[0]
 
         batch_write_fixes(ctx, row_index=0, fixes={"dept": "ENG"})
@@ -1010,27 +1087,31 @@ class TestBatchWriteFixes:
         assert old_fp != new_fp
         assert old_fp not in ctx.state["validated_row_fingerprints"]
 
-    def test_partial_fix_leaves_remaining(self):
-        """Fixing only some fields of a row leaves unfixed fields in pending."""
+    def test_partial_fix_pops_entire_row(self):
+        """Pop-based: partial fix pops entire row. Re-validation catches remaining."""
         row = {**VALID_ROW, "dept": "BAD", "vendor": ""}
         ctx = _make_context([row])
-        ctx.state["pending_fixes"] = [
+        errors = [
             {"row_index": 0, "field": "dept", "current_value": "BAD", "error_message": "Bad dept"},
             {"row_index": 0, "field": "vendor", "current_value": "", "error_message": "Empty"},
         ]
+        ctx.state["pending_review"] = list(errors)
+        ctx.state["all_errors"] = list(errors)
         ctx.state["row_fingerprints"] = compute_all_fingerprints([row])
         ctx.state["validated_row_fingerprints"] = {}
 
         result = batch_write_fixes(ctx, row_index=0, fixes={"dept": "ENG"})
-        assert result["remaining_fixes"] == 1
-        assert ctx.state["pending_fixes"][0]["field"] == "vendor"
+        assert result["remaining_fixes"] == 0  # Entire row popped
+        assert len(ctx.state["pending_review"]) == 0
 
     def test_status_running_when_no_pending(self):
         row = {**VALID_ROW, "dept": "BAD"}
         ctx = _make_context([row])
-        ctx.state["pending_fixes"] = [
+        errors = [
             {"row_index": 0, "field": "dept", "current_value": "BAD", "error_message": "Bad"},
         ]
+        ctx.state["pending_review"] = list(errors)
+        ctx.state["all_errors"] = list(errors)
         ctx.state["row_fingerprints"] = compute_all_fingerprints([row])
         ctx.state["validated_row_fingerprints"] = {}
         ctx.state["status"] = "WAITING_FOR_USER"
@@ -1038,18 +1119,24 @@ class TestBatchWriteFixes:
         batch_write_fixes(ctx, row_index=0, fixes={"dept": "ENG"})
         assert ctx.state["status"] == "RUNNING"
 
-    def test_status_fixing_when_pending_remain(self):
-        row = {**VALID_ROW, "dept": "BAD", "vendor": ""}
-        ctx = _make_context([row])
-        ctx.state["pending_fixes"] = [
-            {"row_index": 0, "field": "dept", "current_value": "BAD", "error_message": "Bad"},
-            {"row_index": 0, "field": "vendor", "current_value": "", "error_message": "Empty"},
+    def test_status_waiting_for_user_when_other_rows_remain(self):
+        """Pop-based: fixing one row leaves other rows, status stays WAITING_FOR_USER."""
+        rows = [
+            {**VALID_ROW, "dept": "BAD"},
+            {**VALID_ROW, "employee_id": "EMP002", "vendor": "", "spend_date": "2024-01-16"},
         ]
-        ctx.state["row_fingerprints"] = compute_all_fingerprints([row])
+        ctx = _make_context(rows)
+        errors = [
+            {"row_index": 0, "field": "dept", "current_value": "BAD", "error_message": "Bad"},
+            {"row_index": 1, "field": "vendor", "current_value": "", "error_message": "Empty"},
+        ]
+        ctx.state["pending_review"] = list(errors)
+        ctx.state["all_errors"] = list(errors)
+        ctx.state["row_fingerprints"] = compute_all_fingerprints(rows)
         ctx.state["validated_row_fingerprints"] = {}
 
         batch_write_fixes(ctx, row_index=0, fixes={"dept": "ENG"})
-        assert ctx.state["status"] == "FIXING"
+        assert ctx.state["status"] == "WAITING_FOR_USER"
 
     def test_invalid_row_index(self):
         ctx = _make_context([VALID_ROW.copy()])
@@ -1065,9 +1152,11 @@ class TestBatchWriteFixes:
         """String row_index should be coerced to int."""
         row = {**VALID_ROW, "dept": "BAD"}
         ctx = _make_context([row])
-        ctx.state["pending_fixes"] = [
+        errors = [
             {"row_index": 0, "field": "dept", "current_value": "BAD", "error_message": "Bad"},
         ]
+        ctx.state["pending_review"] = list(errors)
+        ctx.state["all_errors"] = list(errors)
         ctx.state["row_fingerprints"] = compute_all_fingerprints([row])
         ctx.state["validated_row_fingerprints"] = {}
 
@@ -1076,7 +1165,7 @@ class TestBatchWriteFixes:
 
 
 class TestRemainingFixesTracking:
-    """Tests for remaining_fixes — unbatched errors beyond FIX_BATCH_SIZE."""
+    """Tests for all_errors — all errors tracked, pending_review batched by row."""
 
     def _make_error_rows(self, count):
         """Create count invalid rows (each with bad dept)."""
@@ -1093,71 +1182,69 @@ class TestRemainingFixesTracking:
         return rows
 
     def test_remaining_fixes_populated_when_errors_exceed_batch(self):
-        """10 error rows → pending has 5 rows, remaining has 5 rows."""
+        """10 error rows -> all_errors has 10 rows, pending_review has FIX_BATCH_SIZE rows."""
         rows = self._make_error_rows(10)
         ctx = _make_context(rows)
         validate_data(ctx)
 
-        pending_rows = {f["row_index"] for f in ctx.state["pending_fixes"]}
-        remaining_rows = {f["row_index"] for f in ctx.state["remaining_fixes"]}
+        all_error_rows = {e["row_index"] for e in ctx.state["all_errors"]}
+        pending_rows = {f["row_index"] for f in ctx.state["pending_review"]}
 
+        assert len(all_error_rows) == 10
         assert len(pending_rows) == FIX_BATCH_SIZE
-        assert len(remaining_rows) == 5
-        # No overlap between pending and remaining
-        assert pending_rows.isdisjoint(remaining_rows)
 
     def test_remaining_fixes_empty_when_errors_fit_in_batch(self):
-        """3 error rows → remaining is empty."""
+        """3 error rows -> all_errors and pending_review both have 3 rows."""
         rows = self._make_error_rows(3)
         ctx = _make_context(rows)
         validate_data(ctx)
 
-        assert len(ctx.state["remaining_fixes"]) == 0
-        pending_rows = {f["row_index"] for f in ctx.state["pending_fixes"]}
+        all_error_rows = {e["row_index"] for e in ctx.state["all_errors"]}
+        pending_rows = {f["row_index"] for f in ctx.state["pending_review"]}
+        assert len(all_error_rows) == 3
         assert len(pending_rows) == 3
 
     def test_remaining_fixes_cleared_on_clean_validation(self):
-        """Stale remaining_fixes cleared when validation finds no errors."""
+        """Stale all_errors cleared when validation finds no errors."""
         ctx = _make_context([VALID_ROW.copy()])
-        # Simulate stale remaining from a previous run
-        ctx.state["remaining_fixes"] = [
+        # Simulate stale errors from a previous run
+        ctx.state["all_errors"] = [
             {"row_index": 99, "field": "dept", "current_value": "X", "error_message": "Stale"},
         ]
         validate_data(ctx)
 
-        assert ctx.state["remaining_fixes"] == []
+        assert ctx.state["all_errors"] == []
 
     def test_skip_fixes_includes_remaining(self):
-        """skip_fixes moves both pending + remaining to skipped."""
+        """skip_fixes marks all active error row indices as skipped."""
         rows = self._make_error_rows(8)
         ctx = _make_context(rows)
         validate_data(ctx)
 
-        pending_count = len(ctx.state["pending_fixes"])
-        remaining_count = len(ctx.state["remaining_fixes"])
-        assert pending_count > 0
-        assert remaining_count > 0
+        # All 8 rows have errors in all_errors
+        all_error_rows = {e["row_index"] for e in ctx.state["all_errors"]}
+        assert len(all_error_rows) == 8
 
         result = skip_fixes(ctx)
 
         assert result["status"] == "skipped"
-        assert result["skipped_count"] == pending_count + remaining_count
-        assert len(ctx.state["pending_fixes"]) == 0
-        assert len(ctx.state["remaining_fixes"]) == 0
-        assert len(ctx.state["skipped_fixes"]) == pending_count + remaining_count
+        # All 8 error rows should be in skipped_rows
+        assert len(ctx.state["skipped_rows"]) == 8
+        assert len(ctx.state["pending_review"]) == 0
 
     def test_skip_fixes_remaining_appear_in_package_errors(self):
-        """Full pipeline: validate → skip → package flags all error rows."""
+        """Full pipeline: validate -> skip -> package flags all error rows."""
         from app.tools.processing import package_results
 
         rows = self._make_error_rows(8)
         ctx = _make_context(rows)
         validate_data(ctx)
 
-        # All 8 rows should have errors
-        assert ctx.state["total_error_rows"] == 8
+        # All 8 rows should have errors in all_errors
+        all_error_rows = {e["row_index"] for e in ctx.state["all_errors"]}
+        assert len(all_error_rows) == 8
 
-        # Skip all fixes (pending + remaining)
+        # Skip all fixes
         skip_fixes(ctx)
 
         # Package results

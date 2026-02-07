@@ -9,7 +9,7 @@ import type { FixRequest } from "@/lib/types";
 const TIMEOUT_SECONDS = 30;
 
 interface FixesTableProps {
-  pendingFixes: FixRequest[];
+  pendingReview: FixRequest[];
   waitingSince?: number;
   totalErrorRows?: number;
 }
@@ -20,7 +20,7 @@ interface RowGroup {
 }
 
 export function FixesTable({
-  pendingFixes,
+  pendingReview,
   waitingSince,
   totalErrorRows,
 }: FixesTableProps) {
@@ -36,7 +36,7 @@ export function FixesTable({
   const fixKey = (fix: FixRequest) => `${fix.row_index}-${fix.field}`;
 
   // Filter out submitted rows
-  const activeFixes = pendingFixes.filter(
+  const activeFixes = pendingReview.filter(
     (fix) => !submitted.has(fix.row_index),
   );
 

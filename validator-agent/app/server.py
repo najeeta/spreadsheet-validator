@@ -50,11 +50,14 @@ def _resolve_session_id(thread_id: str) -> str:
 fastapi_app = FastAPI(title="Spreadsheet Validator", version="0.1.0")
 
 # CORS
-cors_origins = os.getenv("CORS_ORIGINS", "*").split(",")
+_cors_raw = os.getenv("CORS_ORIGINS", "*")
+cors_origins = [o.strip() for o in _cors_raw.split(",")]
+# allow_credentials cannot be True with wildcard origins per CORS spec
+_allow_creds = cors_origins != ["*"]
 fastapi_app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
-    allow_credentials=True,
+    allow_credentials=_allow_creds,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -73,7 +76,7 @@ add_adk_fastapi_endpoint(fastapi_app, adk_agent, "/agent")
 HEAVY_KEYS = {
     "dataframe_records",
     "dataframe_columns",
-    "pending_fixes",
+    "pending_review",
 }
 
 
@@ -428,11 +431,10 @@ async def submit_answers(run_id: str, body: AnswerRequest):
 
     # Check if we should signal the background task to resume
     new_status = state.get("status", "")
-    if new_status in ("RUNNING", "FIXING") and new_status != "WAITING_FOR_USER":
+    if new_status == "RUNNING":
         run_manager.signal_resume(run_id)
 
-    pending_count = len(state.get("pending_fixes", []))
-    remaining_count = len(state.get("remaining_fixes", []))
+    pending_count = len(state.get("pending_review", []))
 
     message = f"Applied {applied_count} fixes, skipped {skipped_count} rows."
     if pending_count > 0:
@@ -442,8 +444,8 @@ async def submit_answers(run_id: str, body: AnswerRequest):
 
     return AnswerResponse(
         status=new_status,
-        pending_fixes_count=pending_count,
-        remaining_fixes_count=remaining_count,
+        pending_review_count=pending_count,
+        total_errors_remaining=pending_count,
         skipped_count=skipped_count,
         applied_count=applied_count,
         message=message,

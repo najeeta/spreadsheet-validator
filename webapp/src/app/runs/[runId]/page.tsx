@@ -30,7 +30,6 @@ function getFriendlyToolName(toolName: string): string {
         "IngestionAgent": "Ingestion Agent",
         "ValidationAgent": "Validation Agent",
         "ProcessingAgent": "Processing Agent",
-        "request_file_upload": "Requesting File Upload",
         "ingest_uploaded_file": "Ingesting File",
         "load_spreadsheet": "Loading Spreadsheet",
         "confirm_ingestion": "Confirming Ingestion",

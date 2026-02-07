@@ -17,11 +17,10 @@ _STATE_DEFAULTS: dict[str, Any] = {
     "file_name": None,
     "dataframe_records": lambda: [],
     "dataframe_columns": lambda: [],
-    "pending_fixes": lambda: [],
-    "skipped_fixes": lambda: [],
-    "remaining_fixes": lambda: [],
+    "pending_review": lambda: [],
+    "all_errors": lambda: [],
+    "skipped_rows": lambda: [],
     "waiting_since": None,
-    "total_error_rows": 0,
     "artifacts": lambda: {},
     "row_fingerprints": lambda: [],  # list[str] parallel to dataframe_records
     "validated_row_fingerprints": lambda: {},  # dict[str, bool] fingerprint → was_valid
@@ -94,9 +93,17 @@ def before_model_modifier(callback_context: Any, llm_request: Any) -> None:
             lines.append(f"columns: {columns[:50]}... (+{len(columns) - 50} more)")
         else:
             lines.append(f"columns: {columns}")
-    fixes = state.get("pending_fixes", [])
+    all_errors = state.get("all_errors", [])
+    if all_errors:
+        lines.append(f"all_errors: {len(all_errors)}")
+    fixes = state.get("pending_review", [])
     if fixes:
-        lines.append(f"pending_fixes: {len(fixes)}")
+        lines.append(f"pending_review ({len(fixes)}):")
+        for fix in fixes[:5]:
+            lines.append(
+                f"  - row {fix['row_index']}, {fix['field']}: "
+                f"'{fix.get('current_value', '?')}' — {fix.get('error_message', '?')}"
+            )
     artifacts = state.get("artifacts", {})
     if artifacts:
         lines.append(f"artifacts: {list(artifacts.keys())}")
@@ -133,10 +140,10 @@ def after_tool_callback(
 
     # Log key state fields after tool execution
     logger.info(
-        "[after_tool] Tool '%s' completed. State: status=%s, pending_fixes=%d, validated_fp=%d",
+        "[after_tool] Tool '%s' completed. State: status=%s, pending_review=%d, validated_fp=%d",
         tool_name,
         state.get("status", "?"),
-        len(state.get("pending_fixes", [])),
+        len(state.get("pending_review", [])),
         len(state.get("validated_row_fingerprints", {})),
     )
 

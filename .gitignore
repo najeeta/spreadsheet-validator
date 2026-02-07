@@ -33,3 +33,10 @@ uv.lock
 .pytest_cache/
 .coverage
 htmlcov/
+
+# Testing Code
+/validator-agent/tests/
+/webapp/src/__tests__/
+coverage/
+junit.xml
+test-results/

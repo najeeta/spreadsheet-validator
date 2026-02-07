@@ -168,7 +168,7 @@ class TestPostAnswersWithState:
                         "fx_rate": 1.0,
                     }
                 ],
-                "pending_fixes": [
+                "pending_review": [
                     {
                         "row_index": 0,
                         "field": "dept",
@@ -176,8 +176,15 @@ class TestPostAnswersWithState:
                         "error_message": "Invalid department",
                     },
                 ],
-                "remaining_fixes": [],
-                "skipped_fixes": [],
+                "skipped_rows": [],
+                "all_errors": [
+                    {
+                        "row_index": 0,
+                        "field": "dept",
+                        "current_value": "BAD",
+                        "error_message": "Invalid department",
+                    }
+                ],
             },
         )
 
@@ -229,7 +236,7 @@ class TestPostAnswersWithState:
         assert resp.status_code == 200
         data = resp.json()
         assert data["skipped_count"] == 1
-        assert data["pending_fixes_count"] == 0
+        assert data["pending_review_count"] == 0
 
     @pytest.mark.asyncio
     async def test_skip_specific_row(self, client):
@@ -258,4 +265,4 @@ class TestPostAnswersWithState:
         assert data["applied_count"] == 0
         assert data["skipped_count"] == 0
         # Pending fixes still remain since nothing was done
-        assert data["pending_fixes_count"] == 1
+        assert data["pending_review_count"] == 1

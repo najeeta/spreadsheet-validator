@@ -54,7 +54,7 @@ The root agent delegates to each sub-agent via `AgentTool` wrappers. Each sub-ag
 | `ingest_uploaded_file` | Ingestion | Parses the uploaded artifact (CSV/XLSX) into dataframe records |
 | `ingest_file` | Ingestion | Loads a file from local disk (development/testing) |
 | `confirm_ingestion` | Ingestion | Verifies data is loaded, transitions status to `RUNNING` |
-| `validate_data` | Validation | Runs all business rules, populates `pending_fixes` |
+| `validate_data` | Validation | Runs all business rules, populates `pending_review` |
 | `write_fix` | Validation | Applies a single cell fix from the user |
 | `batch_write_fixes` | Validation | Applies multiple fixes to one row at once |
 | `skip_row` | Validation | Skips a row's fixes (moves to `skipped_fixes`) |
@@ -108,7 +108,7 @@ The root agent delegates to each sub-agent via `AgentTool` wrappers. Each sub-ag
 │                  ▼               │                  │               │
 │   ┌──────────────────────┐      │                  │               │
 │   │  WAITING_FOR_USER    │      │                  │               │
-│   │  Show pending_fixes  │      │                  │               │
+│   │  Show pending_review  │      │                  │               │
 │   │  (batches of 5 rows) │      │                  │               │
 │   └──────────┬───────────┘      │                  │               │
 │              │                  │                  │               │

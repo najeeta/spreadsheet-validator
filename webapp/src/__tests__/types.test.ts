@@ -22,7 +22,7 @@ describe("AgentState types", () => {
     // to prevent frontend state from overwriting backend data during ag-ui-adk sync
     expect(DEFAULT_INITIAL_STATE.dataframe_records).toBeUndefined();
     expect(DEFAULT_INITIAL_STATE.dataframe_columns).toBeUndefined();
-    expect(DEFAULT_INITIAL_STATE.pending_fixes).toBeUndefined();
+    expect(DEFAULT_INITIAL_STATE.pending_review).toBeUndefined();
     expect(DEFAULT_INITIAL_STATE.artifacts).toBeUndefined();
   });
 
@@ -32,21 +32,19 @@ describe("AgentState types", () => {
     expect(DEFAULT_GLOBALS.as_of).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
 
-  it("PipelineStatus type allows all 11 values", () => {
+  it("PipelineStatus type allows all 9 values", () => {
     // TypeScript compile-time check — runtime assertion
     const statuses: PipelineStatus[] = [
       "IDLE",
-      "UPLOADING",
       "INGESTING",
       "RUNNING",
       "VALIDATING",
       "WAITING_FOR_USER",
-      "FIXING",
       "TRANSFORMING",
       "PACKAGING",
       "COMPLETED",
       "FAILED",
     ];
-    expect(statuses).toHaveLength(11);
+    expect(statuses).toHaveLength(9);
   });
 });

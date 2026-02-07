@@ -9,34 +9,9 @@ from app.tools.ingestion import (
     confirm_ingestion,
     ingest_file,
     ingest_uploaded_file,
-    request_file_upload,
 )
 
 FIXTURES = pathlib.Path(__file__).resolve().parent.parent / "fixtures"
-
-
-class TestRequestFileUpload:
-    """request_file_upload returns a dict signaling the UI to show upload dialog."""
-
-    def test_returns_waiting_status(self):
-        ctx = MagicMock()
-        ctx.state = {}
-        result = request_file_upload(ctx)
-        assert result["status"] == "waiting_for_upload"
-
-    def test_returns_accepted_formats(self):
-        ctx = MagicMock()
-        ctx.state = {}
-        result = request_file_upload(ctx)
-        assert "accepted_formats" in result
-        assert ".csv" in result["accepted_formats"]
-        assert ".xlsx" in result["accepted_formats"]
-
-    def test_sets_uploading_status(self):
-        ctx = MagicMock()
-        ctx.state = {}
-        request_file_upload(ctx)
-        assert ctx.state["status"] == "UPLOADING"
 
 
 class TestConfirmIngestion:
@@ -139,9 +114,9 @@ class TestReIngestionStateReset:
         assert result["status"] == "success"
         return ctx
 
-    def test_clears_pending_fixes(self):
+    def test_clears_pending_review(self):
         ctx = self._ingest(
-            pending_fixes=[
+            pending_review=[
                 {
                     "row_index": 0,
                     "field": "dept",
@@ -150,11 +125,11 @@ class TestReIngestionStateReset:
                 }
             ]
         )
-        assert ctx.state["pending_fixes"] == []
+        assert ctx.state["pending_review"] == []
 
-    def test_clears_skipped_fixes(self):
+    def test_clears_all_errors(self):
         ctx = self._ingest(
-            skipped_fixes=[
+            all_errors=[
                 {
                     "row_index": 0,
                     "field": "dept",
@@ -163,15 +138,11 @@ class TestReIngestionStateReset:
                 }
             ]
         )
-        assert ctx.state["skipped_fixes"] == []
+        assert ctx.state["all_errors"] == []
 
-    def test_clears_total_error_rows(self):
-        ctx = self._ingest(total_error_rows=5)
-        assert ctx.state["total_error_rows"] == 0
-
-    def test_clears_validation_complete(self):
-        ctx = self._ingest(validation_complete=True)
-        assert not ctx.state["validation_complete"]
+    def test_clears_skipped_rows(self):
+        ctx = self._ingest(skipped_rows=[0, 1])
+        assert ctx.state["skipped_rows"] == []
 
     def test_clears_waiting_since(self):
         ctx = self._ingest(waiting_since=12345)

@@ -3,6 +3,10 @@
 These are the core state-mutation functions used by both the ADK tool wrappers
 (app/tools/validation.py) and the REST /answers endpoint (app/server.py).
 They operate on plain dicts, not ToolContext.
+
+Pop-based review queue: `pending_review` is the current batch of errors
+awaiting user review. Fix/skip always *pop* from the queue; re-validation
+catches anything that wasn't actually fixed.
 """
 
 from __future__ import annotations
@@ -18,38 +22,37 @@ logger = logging.getLogger(__name__)
 FIX_BATCH_SIZE = 5
 
 
-def _rebatch_fixes(state: dict) -> None:
-    """Move next batch from remaining_fixes to pending_fixes if current batch is empty.
+def _pop_from_review(state: dict, row_index: int) -> str:
+    """Remove all errors for row_index from pending_review.
 
-    This ensures the user sees the next batch of errors when the current batch is
-    fully addressed (all fixes applied or skipped).
+    Returns:
+        "REVALIDATE" if queue is now empty (sets RUNNING).
+        "WAIT_FOR_MORE_FIXES" if items remain (sets WAITING_FOR_USER).
     """
-    pending = state.get("pending_fixes", [])
-    remaining = state.get("remaining_fixes", [])
+    pending = state.get("pending_review", [])
+    state["pending_review"] = [e for e in pending if e["row_index"] != row_index]
 
-    if not pending and remaining:
-        # Move next batch from remaining to pending
-        next_batch = remaining[:FIX_BATCH_SIZE]
-        next_remaining = remaining[FIX_BATCH_SIZE:]
-        state["pending_fixes"] = next_batch
-        state["remaining_fixes"] = next_remaining
-        state["status"] = "WAITING_FOR_USER"
-        state["waiting_since"] = time.time()
-        logger.info("Rebatched fixes: moved %d fixes to pending, %d remain",
-                   len(next_batch), len(next_remaining))
+    if not state["pending_review"]:
+        state["status"] = "RUNNING"
+        state["waiting_since"] = None
+        return "REVALIDATE"
+
+    state["status"] = "WAITING_FOR_USER"
+    state["waiting_since"] = time.time()
+    return "WAIT_FOR_MORE_FIXES"
 
 
 def apply_single_fix(state: dict, row_index: int, field: str, new_value: Any) -> dict:
     """Apply a single cell fix to a data record.
 
     Args:
-        state: Session state dict (must contain dataframe_records, pending_fixes, etc.).
+        state: Session state dict (must contain dataframe_records, etc.).
         row_index: Zero-based row index.
         field: Column name to update.
         new_value: New value for the cell.
 
     Returns:
-        Result dict with status, row_index, field, old/new values, remaining_fixes count.
+        Result dict with status, row_index, field, old/new values, action.
     """
     try:
         row_index = int(row_index)
@@ -87,32 +90,18 @@ def apply_single_fix(state: dict, row_index: int, field: str, new_value: Any) ->
         del valid_fp[old_fp]
     state["validated_row_fingerprints"] = valid_fp
 
-    # Remove matching pending fix
-    old_pending = state.get("pending_fixes", [])
-    new_pending = [
-        f for f in old_pending if not (f["row_index"] == row_index and f["field"] == field)
-    ]
-    state["pending_fixes"] = new_pending
-
-    # Try to rebatch if current batch is empty but more fixes remain
-    _rebatch_fixes(state)
-
-    # Update status based on what's left
-    if not state.get("pending_fixes"):
-        state["status"] = "RUNNING"
-    else:
-        state["status"] = "FIXING"
-        state["waiting_since"] = time.time()
+    # Pop row from review queue
+    action = _pop_from_review(state, row_index)
 
     logger.info("Fixed row %d, field '%s': '%s' -> '%s'", row_index, field, old_value, new_value)
-    total_remaining = len(new_pending) + len(state.get("remaining_fixes", []))
     return {
         "status": "fixed",
         "row_index": row_index,
         "field": field,
         "old_value": old_value,
         "new_value": new_value,
-        "remaining_fixes": total_remaining,
+        "remaining_fixes": len(state.get("pending_review", [])),
+        "action": action,
     }
 
 
@@ -125,7 +114,7 @@ def apply_batch_fixes(state: dict, row_index: int, fixes: dict[str, Any]) -> dic
         fixes: Dict mapping field names to new values.
 
     Returns:
-        Result dict with status, applied changes, remaining_fixes count.
+        Result dict with status, applied changes, action.
     """
     try:
         row_index = int(row_index)
@@ -168,42 +157,28 @@ def apply_batch_fixes(state: dict, row_index: int, fixes: dict[str, Any]) -> dic
         del valid_fp[old_fp]
     state["validated_row_fingerprints"] = valid_fp
 
-    # Remove matching pending fixes for this row + fields
-    fix_fields = set(fixes.keys())
-    old_pending = state.get("pending_fixes", [])
-    new_pending = [
-        f for f in old_pending if not (f["row_index"] == row_index and f["field"] in fix_fields)
-    ]
-    state["pending_fixes"] = new_pending
-
-    # Try to rebatch if current batch is empty but more fixes remain
-    _rebatch_fixes(state)
-
-    if not state.get("pending_fixes"):
-        state["status"] = "RUNNING"
-    else:
-        state["status"] = "FIXING"
-        state["waiting_since"] = time.time()
+    # Pop row from review queue
+    action = _pop_from_review(state, row_index)
 
     logger.info("Batch fixed row %d: %s", row_index, list(fixes.keys()))
-    total_remaining = len(new_pending) + len(state.get("remaining_fixes", []))
     return {
         "status": "fixed",
         "row_index": row_index,
         "applied": applied,
-        "remaining_fixes": total_remaining,
+        "remaining_fixes": len(state.get("pending_review", [])),
+        "action": action,
     }
 
 
 def apply_skip_row(state: dict, row_index: int) -> dict:
-    """Skip a single row — move its fixes from pending to skipped.
+    """Skip a single row — add it to skipped_rows.
 
     Args:
         state: Session state dict.
         row_index: Zero-based row index.
 
     Returns:
-        Result dict with status, remaining_fixes count.
+        Result dict with status, action.
     """
     try:
         row_index = int(row_index)
@@ -213,17 +188,17 @@ def apply_skip_row(state: dict, row_index: int) -> dict:
             "message": f"Invalid row_index: {row_index}. Must be an integer.",
         }
 
-    old_pending = state.get("pending_fixes", [])
-    skipped = state.get("skipped_fixes", [])
-
-    row_fixes = [f for f in old_pending if f["row_index"] == row_index]
-    if not row_fixes:
+    # Check if row has any active errors
+    all_errors = state.get("all_errors", [])
+    row_has_errors = any(e["row_index"] == row_index for e in all_errors)
+    if not row_has_errors:
         return {"status": "no_op", "message": f"No pending fixes for row {row_index}."}
 
-    new_pending = [f for f in old_pending if f["row_index"] != row_index]
-    skipped.extend(row_fixes)
-    state["pending_fixes"] = new_pending
-    state["skipped_fixes"] = skipped
+    # Add to skipped_rows (deduplicated)
+    skipped = state.get("skipped_rows", [])
+    if row_index not in skipped:
+        skipped.append(row_index)
+        state["skipped_rows"] = skipped
 
     # Mark fingerprint as invalid so state reflects true data quality
     fingerprints = state.get("row_fingerprints", [])
@@ -234,26 +209,20 @@ def apply_skip_row(state: dict, row_index: int) -> dict:
             valid_fp[fp] = False
             state["validated_row_fingerprints"] = valid_fp
 
-    # Try to rebatch if current batch is empty but more fixes remain
-    _rebatch_fixes(state)
+    # Pop row from review queue
+    action = _pop_from_review(state, row_index)
 
-    if not state.get("pending_fixes"):
-        state["status"] = "RUNNING"
-    else:
-        state["status"] = "FIXING"
-        state["waiting_since"] = time.time()
-
-    logger.info("Skipped row %d (%d fixes moved to skipped_fixes)", row_index, len(row_fixes))
-    total_remaining = len(new_pending) + len(state.get("remaining_fixes", []))
+    logger.info("Skipped row %d", row_index)
     return {
         "status": "skipped",
         "row_index": row_index,
-        "remaining_fixes": total_remaining,
+        "remaining_fixes": len(state.get("pending_review", [])),
+        "action": action,
     }
 
 
 def apply_skip_all(state: dict) -> dict:
-    """Skip ALL remaining pending + remaining fixes.
+    """Skip ALL remaining active errors.
 
     Args:
         state: Session state dict.
@@ -261,39 +230,48 @@ def apply_skip_all(state: dict) -> dict:
     Returns:
         Result dict with status and skipped_count.
     """
-    pending = state.get("pending_fixes", [])
-    remaining = state.get("remaining_fixes", [])
-    if not pending and not remaining:
+    all_errors = state.get("all_errors", [])
+    skipped = set(state.get("skipped_rows", []))
+    records = state.get("dataframe_records", [])
+
+    # Find all row indices with active (unfixed, unskipped) errors
+    active_row_indices: set[int] = set()
+    for err in all_errors:
+        row_idx = err["row_index"]
+        if row_idx in skipped:
+            continue
+        if row_idx < len(records):
+            current_val = str(records[row_idx].get(err["field"], ""))
+            if current_val != err["current_value"]:
+                continue
+        active_row_indices.add(row_idx)
+
+    if not active_row_indices:
         return {"status": "no_op", "message": "No pending fixes to skip."}
 
     # Mark all skipped row fingerprints as invalid
     fingerprints = state.get("row_fingerprints", [])
     valid_fp = state.get("validated_row_fingerprints", {})
-    skipped_row_indices = {f["row_index"] for f in pending + remaining}
-    for row_index in skipped_row_indices:
+    for row_index in active_row_indices:
         if row_index < len(fingerprints):
             fp = fingerprints[row_index]
             if fp:
                 valid_fp[fp] = False
     state["validated_row_fingerprints"] = valid_fp
 
-    skipped = state.get("skipped_fixes", [])
-    skipped.extend(pending)
-    skipped.extend(remaining)
-    state["skipped_fixes"] = skipped
-    state["pending_fixes"] = []
-    state["remaining_fixes"] = []
+    # Add all active error rows to skipped_rows
+    skipped_list = state.get("skipped_rows", [])
+    for row_idx in active_row_indices:
+        if row_idx not in skipped_list:
+            skipped_list.append(row_idx)
+    state["skipped_rows"] = skipped_list
+
+    state["pending_review"] = []
     state["status"] = "RUNNING"
-    state["validation_complete"] = True
     state["waiting_since"] = None
 
-    skipped_count = len(pending) + len(remaining)
-    logger.info(
-        "Skipped all %d remaining fixes (pending=%d, remaining=%d)",
-        skipped_count,
-        len(pending),
-        len(remaining),
-    )
+    skipped_count = len(active_row_indices)
+    logger.info("Skipped all %d remaining error rows", skipped_count)
     return {
         "status": "skipped",
         "action": "Proceed directly to process_results. Do NOT re-validate.",

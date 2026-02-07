@@ -42,8 +42,8 @@ class AnswerResponse(BaseModel):
     """Response from POST /runs/{run_id}/answers."""
 
     status: str
-    pending_fixes_count: int
-    remaining_fixes_count: int
+    pending_review_count: int
+    total_errors_remaining: int
     skipped_count: int
     applied_count: int
     message: str

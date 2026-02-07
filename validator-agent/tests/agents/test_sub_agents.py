@@ -6,17 +6,16 @@ from app.agents.validation import validation_agent
 
 
 class TestIngestionAgent:
-    """IngestionAgent has 4 tools and correct config."""
+    """IngestionAgent has 3 tools and correct config."""
 
     def test_name(self):
         assert ingestion_agent.name == "load_spreadsheet"
 
     def test_tool_count(self):
-        assert len(ingestion_agent.tools) == 4
+        assert len(ingestion_agent.tools) == 3
 
     def test_tool_names(self):
         tool_names = {t.__name__ if callable(t) else t.name for t in ingestion_agent.tools}
-        assert "request_file_upload" in tool_names
         assert "ingest_uploaded_file" in tool_names
         assert "confirm_ingestion" in tool_names
         assert "ingest_file" in tool_names

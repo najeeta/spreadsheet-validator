@@ -21,11 +21,13 @@ vi.mock("@copilotkit/runtime-client-gql", () => ({
   Role: { User: "user" },
 }));
 
-// Mock ValidatorContext used by UploadCard
+// Mock ValidatorContext used by CompletionCard
 vi.mock("@/contexts/ValidatorContext", () => ({
   useValidator: () => ({
     threadId: "test-thread",
     setThreadId: vi.fn(),
+    triggerUpload: vi.fn(),
+    setAgentState: vi.fn(),
   }),
 }));
 
@@ -41,10 +43,9 @@ describe("stateToCard", () => {
 
   it("imports all card components", () => {
     const source = fs.readFileSync(filePath, "utf8");
-    expect(source).toContain("ProgressCard");
     expect(source).toContain("CompletionCard");
     expect(source).toContain("FixesTable");
-    expect(source).toContain("UploadCard");
+    expect(source).toContain("ProcessingSkeleton");
   });
 
   it("exports renderForState and renderCardForState", () => {
@@ -60,8 +61,6 @@ describe("stateToCard", () => {
     expect(source).toContain("PACKAGING");
     expect(source).toContain("WAITING_FOR_USER");
     expect(source).toContain("VALIDATING");
-    expect(source).toContain("FIXING");
-    expect(source).toContain("UPLOADING");
     expect(source).toContain("INGESTING");
     expect(source).toContain("RUNNING");
   });
@@ -76,8 +75,23 @@ describe("stateToCard", () => {
   });
 });
 
+describe("renderForState — RUNNING", () => {
+  it("renders a ProcessingSkeleton for RUNNING status", () => {
+    const state: AgentState = {
+      status: "RUNNING",
+      file_name: "test.csv",
+    };
+
+    const element = renderForState(state);
+    expect(element).not.toBeNull();
+
+    render(element!);
+    expect(screen.getByText(/analyzing spreadsheet/i)).toBeInTheDocument();
+  });
+});
+
 describe("renderForState — INGESTING", () => {
-  it("renders a ProgressCard for INGESTING status", () => {
+  it("renders a ProcessingSkeleton for INGESTING status", () => {
     const state: AgentState = {
       status: "INGESTING",
       file_name: "test.csv",
@@ -87,17 +101,17 @@ describe("renderForState — INGESTING", () => {
     expect(element).not.toBeNull();
 
     render(element!);
-    expect(screen.getByText("Ingesting spreadsheet...")).toBeInTheDocument();
+    expect(screen.getByText(/analyzing spreadsheet/i)).toBeInTheDocument();
   });
 });
 
-describe("renderForState — COMPLETED with skipped_fixes", () => {
+describe("renderForState — COMPLETED with skipped_rows", () => {
   function makeRows(n: number): Record<string, unknown>[] {
     return Array.from({ length: n }, (_, i) => ({ id: i }));
   }
 
-  it("shows correct counts when skipped_fixes is present", () => {
-    const skippedFixes: FixRequest[] = [
+  it("shows correct counts when skipped_rows is present", () => {
+    const allErrors: FixRequest[] = [
       { row_index: 3, field: "amount", current_value: "-1", error_message: "negative" },
       { row_index: 7, field: "date", current_value: "bad", error_message: "invalid date" },
     ];
@@ -106,8 +120,9 @@ describe("renderForState — COMPLETED with skipped_fixes", () => {
       status: "COMPLETED",
       file_name: "test.csv",
       dataframe_records: makeRows(15),
-      pending_fixes: [],
-      skipped_fixes: skippedFixes,
+      pending_review: [],
+      all_errors: allErrors,
+      skipped_rows: [3, 7],
       artifacts: { "success.xlsx": "success.xlsx", "errors.xlsx": "errors.xlsx" },
     };
 
@@ -123,9 +138,9 @@ describe("renderForState — COMPLETED with skipped_fixes", () => {
     expect(screen.getByText("0")).toBeInTheDocument();
   });
 
-  it("deduplicates skipped_fixes by row_index", () => {
-    // Two errors on the same row should count as 1 error row
-    const skippedFixes: FixRequest[] = [
+  it("deduplicates all_errors by row_index for totalErrorRows", () => {
+    // Two errors on the same row should count as 1 error row in totalErrorRows
+    const allErrors: FixRequest[] = [
       { row_index: 5, field: "amount", current_value: "-1", error_message: "negative" },
       { row_index: 5, field: "date", current_value: "bad", error_message: "invalid date" },
       { row_index: 9, field: "name", current_value: "", error_message: "empty" },
@@ -135,8 +150,9 @@ describe("renderForState — COMPLETED with skipped_fixes", () => {
       status: "COMPLETED",
       file_name: "test.csv",
       dataframe_records: makeRows(10),
-      pending_fixes: [],
-      skipped_fixes: skippedFixes,
+      pending_review: [],
+      all_errors: allErrors,
+      skipped_rows: [5, 9],
       artifacts: { "success.xlsx": "s" },
     };
 
@@ -148,13 +164,14 @@ describe("renderForState — COMPLETED with skipped_fixes", () => {
     expect(screen.getByText("8")).toBeInTheDocument();  // valid = 10 - 2
   });
 
-  it("shows all valid when no skipped_fixes", () => {
+  it("shows all valid when no skipped_rows", () => {
     const state: AgentState = {
       status: "COMPLETED",
       file_name: "test.csv",
       dataframe_records: makeRows(5),
-      pending_fixes: [],
-      skipped_fixes: [],
+      pending_review: [],
+      all_errors: [],
+      skipped_rows: [],
       artifacts: { "success.xlsx": "s" },
     };
 
@@ -168,12 +185,12 @@ describe("renderForState — COMPLETED with skipped_fixes", () => {
     expect(zeros).toHaveLength(2); // errors + fixed
   });
 
-  it("shows all valid when skipped_fixes is undefined", () => {
+  it("shows all valid when skipped_rows is undefined", () => {
     const state: AgentState = {
       status: "COMPLETED",
       file_name: "test.csv",
       dataframe_records: makeRows(8),
-      pending_fixes: [],
+      pending_review: [],
       artifacts: {},
     };
 

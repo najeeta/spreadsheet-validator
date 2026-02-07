@@ -114,28 +114,27 @@ def package_results(tool_context: Any) -> dict:
     so they survive AgentTool child-session boundaries. The download
     endpoint reads from session state.
 
-    IMPORTANT: This tool will refuse to run if there are pending fixes.
+    IMPORTANT: This tool will refuse to run if there are pending review items.
     The user must fix all validation errors before packaging.
     """
     state = tool_context.state
     records = state.get("dataframe_records", [])
-    pending_fixes = state.get("pending_fixes", [])
-    skipped_fixes = state.get("skipped_fixes", [])
+    pending_review = state.get("pending_review", [])
     current_status = state.get("status", "IDLE")
 
-    # Guard: Refuse to package if we're waiting for user fixes or have unresolved pending fixes
-    if current_status == "WAITING_FOR_USER" or pending_fixes:
+    # Guard: Refuse to package if we're waiting for user fixes or have unresolved pending review items
+    if current_status == "WAITING_FOR_USER" or pending_review:
         logger.warning(
-            "package_results called while status=%s with %d pending fixes - refusing to proceed",
+            "package_results called while status=%s with %d pending review items - refusing to proceed",
             current_status,
-            len(pending_fixes),
+            len(pending_review),
         )
         return {
             "status": "error",
             "action": "STOP - Cannot package results while waiting for user fixes.",
-            "message": f"Cannot process results - status is {current_status} with {len(pending_fixes)} validation errors. "
+            "message": f"Cannot process results - status is {current_status} with {len(pending_review)} validation errors. "
             "Wait for the user to provide fixes, then call validate_data again before packaging.",
-            "pending_fixes_count": len(pending_fixes),
+            "pending_review_count": len(pending_review),
         }
 
     state["status"] = "PACKAGING"
@@ -144,29 +143,18 @@ def package_results(tool_context: Any) -> dict:
     auto_add_computed_columns(records, columns, state)
     state["dataframe_columns"] = columns
 
-    # Determine which row indices have errors (from skipped_fixes — user-skipped rows)
-    error_indices = {fix["row_index"] for fix in skipped_fixes}
+    # Determine error rows from skipped_rows + all_errors
+    error_indices = set(state.get("skipped_rows", []))
+    all_errors = state.get("all_errors", [])
 
-    # Defensive: include any stale remaining_fixes that weren't moved to skipped
-    remaining_fixes = state.get("remaining_fixes", [])
-    if remaining_fixes:
-        logger.warning(
-            "package_results found %d stale remaining_fixes — including in error rows",
-            len(remaining_fixes),
-        )
-        for fix in remaining_fixes:
-            error_indices.add(fix["row_index"])
-            # Also add to skipped_fixes so error_reason is populated
-            skipped_fixes.append(fix)
-        state["remaining_fixes"] = []
-
-    # Group errors by row_index for error summary
+    # Group errors by row_index for error summary (only for skipped rows)
     errors_by_row: dict[int, list[str]] = {}
-    for fix in skipped_fixes:
-        row_idx = fix["row_index"]
-        if row_idx not in errors_by_row:
-            errors_by_row[row_idx] = []
-        errors_by_row[row_idx].append(fix["error_message"])
+    for err in all_errors:
+        row_idx = err["row_index"]
+        if row_idx in error_indices:
+            if row_idx not in errors_by_row:
+                errors_by_row[row_idx] = []
+            errors_by_row[row_idx].append(err["error_message"])
 
     valid_rows = [r for i, r in enumerate(records) if i not in error_indices]
     invalid_rows = []

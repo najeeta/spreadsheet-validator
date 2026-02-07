@@ -121,7 +121,7 @@ class TestToolChainDirect:
         ctx.state = {
             "dataframe_records": [],
             "dataframe_columns": [],
-            "pending_fixes": [],
+            "pending_review": [],
             "artifacts": {},
             "status": "IDLE",
         }
@@ -185,8 +185,9 @@ class TestToolChainDirect:
         ctx.state = {
             "dataframe_records": [],
             "dataframe_columns": [],
-            "pending_fixes": [],
-            "skipped_fixes": [],
+            "pending_review": [],
+            "all_errors": [],
+            "skipped_rows": [],
             "artifacts": {},
             "status": "IDLE",
         }
@@ -196,12 +197,12 @@ class TestToolChainDirect:
         assert ingest_result["status"] == "success"
         assert ingest_result["row_count"] == 4
 
-        # Validate — should find errors and auto-populate pending_fixes
+        # Validate — should find errors and auto-populate pending_review
         validate_result = validate_data(ctx)
         assert validate_result["error_count"] > 0
         assert validate_result["status"] == "waiting_for_fixes"
         assert ctx.state["status"] == "WAITING_FOR_USER"
-        assert len(ctx.state["pending_fixes"]) > 0
+        assert len(ctx.state["pending_review"]) > 0
 
         # Guard: package_results should reject while WAITING_FOR_USER
         guard_result = package_results(ctx)
@@ -212,7 +213,7 @@ class TestToolChainDirect:
         skip_result = skip_fixes(ctx)
         assert skip_result["status"] == "skipped"
         assert ctx.state["status"] == "RUNNING"
-        assert len(ctx.state["skipped_fixes"]) > 0
+        assert len(ctx.state["skipped_rows"]) > 0
 
         # Package — should now separate valid and invalid using skipped_fixes
         package_result = package_results(ctx)
@@ -252,7 +253,7 @@ class TestToolChainDirect:
         ctx.state = {
             "dataframe_records": [],
             "dataframe_columns": [],
-            "pending_fixes": [],
+            "pending_review": [],
             "artifacts": {},
             "status": "IDLE",
         }
@@ -307,7 +308,7 @@ class TestToolChainDirect:
         ctx.state = {
             "dataframe_records": [],
             "dataframe_columns": [],
-            "pending_fixes": [],
+            "pending_review": [],
             "artifacts": {},
             "status": "IDLE",
         }
@@ -359,8 +360,9 @@ class TestFixLoopE2E:
         ctx.state = {
             "dataframe_records": [],
             "dataframe_columns": [],
-            "pending_fixes": [],
-            "skipped_fixes": [],
+            "pending_review": [],
+            "all_errors": [],
+            "skipped_rows": [],
             "artifacts": {},
             "status": "IDLE",
         }
@@ -380,14 +382,14 @@ class TestFixLoopE2E:
 
         ctx = self._setup_ctx_with_errors()
         assert ctx.state["status"] == "WAITING_FOR_USER"
-        assert len(ctx.state["pending_fixes"]) > 0
+        assert len(ctx.state["pending_review"]) > 0
 
         # Skip the first error row
-        first_row_idx = ctx.state["pending_fixes"][0]["row_index"]
+        first_row_idx = ctx.state["pending_review"][0]["row_index"]
         skip_row(ctx, row_index=first_row_idx)
 
         # Skip all remaining
-        if ctx.state["pending_fixes"]:
+        if ctx.state["pending_review"]:
             skip_fixes(ctx)
 
         # Package
@@ -409,7 +411,7 @@ EMP002,SALES,2500.50,USD,2024-02-20,Beta Inc,1.0
         assert ctx.state["status"] == "WAITING_FOR_USER"
 
         # Fix the bad dept
-        error_row = ctx.state["pending_fixes"][0]["row_index"]
+        error_row = ctx.state["pending_review"][0]["row_index"]
         batch_write_fixes(ctx, row_index=error_row, fixes={"dept": "HR"})
 
         # Re-validate — should be clean now
@@ -431,10 +433,9 @@ EMP002,SALES,2500.50,USD,2024-02-20,Beta Inc,1.0
         ctx = self._setup_ctx_with_errors()
         assert ctx.state["status"] == "WAITING_FOR_USER"
 
-        pending_count = len(ctx.state["pending_fixes"])
         skip_fixes(ctx)
         assert ctx.state["status"] == "RUNNING"
-        assert len(ctx.state["skipped_fixes"]) == pending_count
+        assert len(ctx.state["skipped_rows"]) > 0
 
         result = package_results(ctx)
         assert result["status"] == "success"
@@ -470,8 +471,9 @@ class TestReUploadErrorsXlsx:
         ctx.state = {
             "dataframe_records": [],
             "dataframe_columns": [],
-            "pending_fixes": [],
-            "skipped_fixes": [],
+            "pending_review": [],
+            "all_errors": [],
+            "skipped_rows": [],
             "artifacts": {},
             "status": "IDLE",
         }
@@ -482,7 +484,7 @@ class TestReUploadErrorsXlsx:
 
         skip_fixes(ctx)
         assert ctx.state["status"] == "RUNNING"
-        assert len(ctx.state["skipped_fixes"]) > 0
+        assert len(ctx.state["skipped_rows"]) > 0
 
         package_result = package_results(ctx)
         assert package_result["status"] == "success"
@@ -504,10 +506,8 @@ class TestReUploadErrorsXlsx:
         assert ingest_result["status"] == "success"
 
         # Stale validation state should be cleared
-        assert ctx.state["pending_fixes"] == []
-        assert ctx.state["skipped_fixes"] == []
-        assert ctx.state["total_error_rows"] == 0
-        assert not ctx.state["validation_complete"]
+        assert ctx.state["pending_review"] == []
+        assert ctx.state["skipped_rows"] == []
         assert ctx.state["waiting_since"] is None
 
         # Output columns should be stripped
