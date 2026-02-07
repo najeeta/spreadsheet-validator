@@ -28,16 +28,13 @@ class PipelineState(BaseModel):
     """
 
     status: Status = "IDLE"
-    active_run_id: Optional[str] = None
-    file_path: Optional[str] = None
     file_name: Optional[str] = None
-    uploaded_file: Optional[str] = None
     dataframe_records: list[dict] = []
     dataframe_columns: list[str] = []
-    validation_errors: list[dict] = []
-    validation_complete: bool = False
     pending_fixes: list[dict] = []
+    skipped_fixes: list[dict] = []
+    remaining_fixes: list[dict] = []
+    waiting_since: Optional[float] = None
+    total_error_rows: int = 0
     artifacts: dict[str, str] = {}
-    as_of: Optional[str] = None
-    usd_rounding: Optional[Literal["cents", "whole"]] = "cents"
-    cost_center_map: dict[str, str] = {}
+    globals: Optional[dict] = None  # RunGlobals from frontend (e.g. cost_center_map)

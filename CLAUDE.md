@@ -11,21 +11,21 @@ The **SpreadsheetValidator** uses AG-UI state-driven rendering to build a valida
 cd validator-agent && uv sync
 
 # Backend — run tests
-cd validator-agent && pytest tests/ -v
+cd validator-agent && uv run pytest tests/ -v
 
 # Backend — run tests with coverage
-cd validator-agent && pytest tests/ --cov=app --cov-report=term-missing -v
+cd validator-agent && uv run pytest tests/ --cov=app --cov-report=term-missing -v
 
 # Backend — lint
-cd validator-agent && ruff check .
-cd validator-agent && ruff format --check .
+cd validator-agent && uv run ruff check .
+cd validator-agent && uv run ruff format --check .
 
 # Backend — run FastAPI server
-cd validator-agent && uvicorn app.server:fastapi_app --host 0.0.0.0 --port 8080
+cd validator-agent && uv run uvicorn app.server:fastapi_app --host 0.0.0.0 --port 8080
 
 # Backend — run agent locally (ADK)
-cd validator-agent && adk web
-cd validator-agent && adk run app
+cd validator-agent && uv run adk web
+cd validator-agent && uv run adk run app
 
 # Frontend — install dependencies
 cd webapp && npm install
@@ -134,6 +134,30 @@ FastAPI server at port 8080 with ag-ui-adk SSE:
 - `POST /feedback` — User feedback (thumbs up/down)
 - `POST /agent` — AG-UI streaming endpoint (SSE via ag-ui-adk)
 
+### Debugging Agent State (In-Memory, No SQLite)
+
+The backend uses `InMemorySessionService` — there is no SQLite database. Query session state via the REST API while the server is running:
+
+```bash
+# List all sessions (lightweight, strips heavy keys like dataframe_records)
+curl -s http://localhost:8080/runs | python3 -m json.tool
+
+# Full session state for a specific session
+curl -s http://localhost:8080/runs/{session_id} | python3 -m json.tool
+
+# Health check
+curl -s http://localhost:8080/health
+```
+
+Key things to look for when debugging:
+- **`status`** — current pipeline status (IDLE, UPLOADING, RUNNING, etc.)
+- **`uploaded_file`** / **`file_name`** — whether file upload was recorded in state
+- **`dataframe_records`** — present only after successful ingestion
+- **`validation_errors`** — present only after validation runs
+- **`_ag_ui_thread_id`** — the thread ID ag-ui-adk uses to match sessions
+
+**Common pitfall**: ag-ui-adk resolves sessions by `user_id` + `_ag_ui_thread_id`. The `ADKAgent.from_app()` call must pass `user_id=USER_ID` to match the user ID used by `POST /run` and `POST /upload`. Without it, ag-ui-adk defaults to `"thread_user_{thread_id}"`, creates a new session, and artifacts from the upload endpoint won't be found.
+
 ### Frontend
 
 CopilotKit + HttpAgent connecting to `/agent` SSE endpoint:
@@ -210,17 +234,17 @@ GOOGLE_CLOUD_LOCATION=us-central1
 
 ```bash
 # Backend — all tests
-cd validator-agent && pytest tests/ -v
+cd validator-agent && uv run pytest tests/ -v
 
 # Backend — with coverage
-cd validator-agent && pytest tests/ --cov=app --cov-report=term-missing -v
+cd validator-agent && uv run pytest tests/ --cov=app --cov-report=term-missing -v
 
 # Backend — specific directories
-cd validator-agent && pytest tests/foundation/ -v
-cd validator-agent && pytest tests/agents/ -v
-cd validator-agent && pytest tests/tools/ -v
-cd validator-agent && pytest tests/server/ -v
-cd validator-agent && pytest tests/e2e/ -v
+cd validator-agent && uv run pytest tests/foundation/ -v
+cd validator-agent && uv run pytest tests/agents/ -v
+cd validator-agent && uv run pytest tests/tools/ -v
+cd validator-agent && uv run pytest tests/server/ -v
+cd validator-agent && uv run pytest tests/e2e/ -v
 
 # Frontend — all tests
 cd webapp && npx vitest run
@@ -229,7 +253,7 @@ cd webapp && npx vitest run
 cd webapp && npx vitest
 
 # Lint
-cd validator-agent && ruff check . && ruff format --check .
+cd validator-agent && uv run ruff check . && uv run ruff format --check .
 ```
 
 ### Coverage Targets

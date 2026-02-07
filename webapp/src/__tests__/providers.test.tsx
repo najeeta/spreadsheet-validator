@@ -11,9 +11,10 @@ describe("Providers", () => {
     expect(source).not.toContain("renderActivityMessages");
   });
 
-  it("has CopilotKitProvider with runtimeUrl", () => {
+  it("has CopilotKitProvider with runtimeUrl in run page", () => {
+    // CopilotKitProvider is now in the runs/[runId]/page.tsx client component
     const source = fs.readFileSync(
-      path.resolve(__dirname, "../app/Providers.tsx"),
+      path.resolve(__dirname, "../app/runs/[runId]/page.tsx"),
       "utf8"
     );
     expect(source).toContain("CopilotKitProvider");

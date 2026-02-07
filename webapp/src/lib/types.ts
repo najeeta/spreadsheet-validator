@@ -5,6 +5,7 @@
 export type PipelineStatus =
   | "IDLE"
   | "UPLOADING"
+  | "INGESTING"
   | "RUNNING"
   | "VALIDATING"
   | "WAITING_FOR_USER"
@@ -14,10 +15,16 @@ export type PipelineStatus =
   | "COMPLETED"
   | "FAILED";
 
-export interface ValidationError {
-  row_index: number;
-  row_data: Record<string, unknown>;
-  errors: Array<{ field: string; error: string }>;
+export type UsdRounding = "cents" | "whole";
+
+export interface CostCenterMapping {
+  [department: string]: string; // dept → cost_center_code
+}
+
+export interface RunGlobals {
+  as_of: string; // ISO date string (YYYY-MM-DD)
+  usd_rounding: UsdRounding;
+  cost_center_map: CostCenterMapping;
 }
 
 export interface FixRequest {
@@ -29,34 +36,37 @@ export interface FixRequest {
 
 export interface AgentState {
   status: PipelineStatus;
-  active_run_id: string | null;
-  file_path: string | null;
   file_name: string | null;
-  uploaded_file: string | null;
-  dataframe_records: Record<string, unknown>[];
-  dataframe_columns: string[];
-  validation_errors: ValidationError[];
-  validation_complete: boolean;
-  pending_fixes: FixRequest[];
-  artifacts: Record<string, string>;
-  as_of: string | null;
-  usd_rounding: "cents" | "whole" | null;
-  cost_center_map: Record<string, string>;
+  // User-provided globals for the run
+  globals?: RunGlobals;
+  // Data fields are optional - they're set by the backend only
+  // and should NOT be in the initial state to avoid overwriting backend data
+  dataframe_records?: Record<string, unknown>[];
+  dataframe_columns?: string[];
+  pending_fixes?: FixRequest[];
+  skipped_fixes?: FixRequest[];
+  waiting_since?: number;
+  total_error_rows?: number;
+  artifacts?: Record<string, string>;
+  validation_errors?: unknown[];
+  validation_complete?: boolean;
+  uploaded_file?: string;
 }
 
-export const DEFAULT_INITIAL_STATE: AgentState = {
-  status: "IDLE",
-  active_run_id: null,
-  file_path: null,
-  file_name: null,
-  uploaded_file: null,
-  dataframe_records: [],
-  dataframe_columns: [],
-  validation_errors: [],
-  validation_complete: false,
-  pending_fixes: [],
-  artifacts: {},
-  as_of: null,
+// Default globals with sensible defaults
+export const DEFAULT_GLOBALS: RunGlobals = {
+  as_of: new Date().toISOString().split("T")[0], // Today's date
   usd_rounding: "cents",
   cost_center_map: {},
+};
+
+// Initial state sent to CopilotKit - EXCLUDES data fields to prevent
+// frontend state from overwriting backend data during ag-ui-adk sync
+export const DEFAULT_INITIAL_STATE: AgentState = {
+  status: "IDLE",
+  file_name: null,
+  globals: DEFAULT_GLOBALS,
+  // NOTE: dataframe_records, dataframe_columns, pending_fixes,
+  // artifacts are intentionally OMITTED here.
+  // They are backend-only and will be received via SSE STATE_DELTA events.
 };

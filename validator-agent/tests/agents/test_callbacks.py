@@ -16,13 +16,13 @@ class TestOnBeforeAgent:
     def test_fills_defaults_when_empty(self):
         ctx = self._make_context({})
         on_before_agent(ctx)
-        assert ctx.state["status"] == "IDLE"
+        # status is NOT set by the callback — it must be set explicitly
+        # by session creation or agent tools to avoid silent resets
+        assert "status" not in ctx.state
         assert ctx.state["dataframe_records"] == []
         assert ctx.state["dataframe_columns"] == []
-        assert ctx.state["validation_errors"] == []
         assert ctx.state["pending_fixes"] == []
         assert ctx.state["artifacts"] == {}
-        assert ctx.state["validation_complete"] is False
 
     def test_preserves_existing_values(self):
         ctx = self._make_context({"status": "RUNNING", "file_name": "test.csv"})
@@ -41,7 +41,7 @@ class TestOnBeforeAgent:
 
 
 class TestBeforeModelModifier:
-    """before_model_modifier should inject state summary for root agent only."""
+    """before_model_modifier should inject state summary for all agents."""
 
     def _make_context(self, state: dict, agent_name: str) -> MagicMock:
         ctx = MagicMock()
@@ -69,11 +69,11 @@ class TestBeforeModelModifier:
         assert "status: RUNNING" in req.config.system_instruction
         assert "file_name: data.csv" in req.config.system_instruction
 
-    def test_skips_non_root_agent(self):
+    def test_injects_summary_for_non_root_agent(self):
         ctx = self._make_context({"status": "RUNNING"}, "IngestionAgent")
         req = self._make_request("You are ingestion.")
         before_model_modifier(ctx, req)
-        assert "status:" not in req.config.system_instruction
+        assert "status: RUNNING" in req.config.system_instruction
 
     def test_no_a2ui_hints_in_summary(self):
         ctx = self._make_context(
@@ -86,6 +86,24 @@ class TestBeforeModelModifier:
         assert "a2ui" not in injected.lower()
         assert "render_a2ui" not in injected.lower()
         assert "activity" not in injected.lower()
+
+    def test_before_model_includes_cost_center_map(self):
+        ctx = self._make_context(
+            {
+                "status": "RUNNING",
+                "globals": {
+                    "cost_center_map": {"FIN": "CC-100", "HR": "CC-200"},
+                    "as_of": "2024-06-01",
+                },
+            },
+            "SpreadsheetValidatorAgent",
+        )
+        req = self._make_request("You are an agent.")
+        before_model_modifier(ctx, req)
+        injected = req.config.system_instruction
+        assert "cost_center_map" in injected
+        assert "CC-100" in injected
+        assert "as_of: 2024-06-01" in injected
 
 
 class TestAfterModelModifier:

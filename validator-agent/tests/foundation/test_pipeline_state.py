@@ -25,10 +25,6 @@ class TestPipelineStateDefaults:
         state = PipelineState()
         assert state.dataframe_columns == []
 
-    def test_default_validation_errors_empty(self):
-        state = PipelineState()
-        assert state.validation_errors == []
-
     def test_default_pending_fixes_empty(self):
         state = PipelineState()
         assert state.pending_fixes == []
@@ -36,14 +32,6 @@ class TestPipelineStateDefaults:
     def test_default_artifacts_empty(self):
         state = PipelineState()
         assert state.artifacts == {}
-
-    def test_default_validation_complete_false(self):
-        state = PipelineState()
-        assert state.validation_complete is False
-
-    def test_default_usd_rounding_is_cents(self):
-        state = PipelineState()
-        assert state.usd_rounding == "cents"
 
 
 class TestPipelineStateStatusValues:

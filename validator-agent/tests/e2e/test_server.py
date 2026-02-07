@@ -34,32 +34,39 @@ class TestRunEndpoint:
     @pytest.mark.asyncio
     async def test_create_run(self, client):
         async with client as c:
-            resp = await c.post("/run", params={"thread_id": "test-thread-1"})
+            resp = await c.post("/run")
         assert resp.status_code == 200
         data = resp.json()
         assert "session_id" in data
 
     @pytest.mark.asyncio
-    async def test_create_run_has_thread_id_in_state(self, client):
+    async def test_create_run_returns_session_id(self, client):
         async with client as c:
-            resp = await c.post("/run", params={"thread_id": "test-thread-2"})
+            resp = await c.post("/run")
         data = resp.json()
-        assert data.get("thread_id") == "test-thread-2"
+        # Session ID should be a non-empty string (UUID)
+        assert isinstance(data.get("session_id"), str)
+        assert len(data["session_id"]) > 0
 
 
 class TestUploadEndpoint:
-    """POST /upload saves file as artifact and updates session state."""
+    """POST /upload saves file as artifact (no state updates)."""
 
     @pytest.mark.asyncio
     async def test_upload_csv(self, client):
         async with client as c:
             # First create a session
-            await c.post("/run", params={"thread_id": "upload-test"})
+            run_resp = await c.post("/run")
+            session_id = run_resp.json()["session_id"]
 
-            # Upload a CSV
+            # Upload a CSV using form data
             csv_content = b"employee_id,dept,amount\nEMP001,Engineering,1500"
             files = {"file": ("test.csv", io.BytesIO(csv_content), "text/csv")}
-            resp = await c.post("/upload", params={"thread_id": "upload-test"}, files=files)
+            resp = await c.post(
+                "/upload",
+                data={"session_id": session_id},
+                files=files,
+            )
 
         assert resp.status_code == 200
         data = resp.json()
@@ -69,10 +76,15 @@ class TestUploadEndpoint:
     @pytest.mark.asyncio
     async def test_upload_rejects_invalid_type(self, client):
         async with client as c:
-            await c.post("/run", params={"thread_id": "upload-reject-test"})
+            run_resp = await c.post("/run")
+            session_id = run_resp.json()["session_id"]
 
             files = {"file": ("test.json", io.BytesIO(b'{"a": 1}'), "application/json")}
-            resp = await c.post("/upload", params={"thread_id": "upload-reject-test"}, files=files)
+            resp = await c.post(
+                "/upload",
+                data={"session_id": session_id},
+                files=files,
+            )
 
         assert resp.status_code == 400
 
@@ -83,7 +95,7 @@ class TestRunsEndpoint:
     @pytest.mark.asyncio
     async def test_list_runs(self, client):
         async with client as c:
-            await c.post("/run", params={"thread_id": "list-test-1"})
+            await c.post("/run")
             resp = await c.get("/runs")
         assert resp.status_code == 200
         data = resp.json()
@@ -92,12 +104,13 @@ class TestRunsEndpoint:
     @pytest.mark.asyncio
     async def test_get_run_detail(self, client):
         async with client as c:
-            run_resp = await c.post("/run", params={"thread_id": "detail-test"})
+            run_resp = await c.post("/run")
             session_id = run_resp.json()["session_id"]
             resp = await c.get(f"/runs/{session_id}")
         assert resp.status_code == 200
         data = resp.json()
-        assert "status" in data
+        # Session state has AG-UI metadata, status is set by /run
+        assert "_ag_ui_thread_id" in data
 
     @pytest.mark.asyncio
     async def test_get_run_not_found(self, client):
@@ -108,7 +121,7 @@ class TestRunsEndpoint:
     @pytest.mark.asyncio
     async def test_list_runs_strips_heavy_keys(self, client):
         async with client as c:
-            await c.post("/run", params={"thread_id": "heavy-test"})
+            await c.post("/run")
             resp = await c.get("/runs")
         data = resp.json()
         if data:

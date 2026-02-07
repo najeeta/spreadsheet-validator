@@ -1,27 +1,40 @@
 """Tests for root agent — Story 3.2."""
 
+from google.adk.tools import AgentTool
+
 from app.agents.root_agent import root_agent
 
 
 class TestRootAgentConfig:
-    """Root agent has correct name, sub-agents, and no tools."""
+    """Root agent has AgentTool wrappers + write_fix."""
 
     def test_name(self):
         assert root_agent.name == "SpreadsheetValidatorAgent"
 
-    def test_has_three_sub_agents(self):
-        assert len(root_agent.sub_agents) == 3
+    def test_has_no_sub_agents(self):
+        # All agents are now AgentTools, not sub_agents
+        sub_agents = getattr(root_agent, "sub_agents", [])
+        assert len(sub_agents) == 0
 
-    def test_sub_agent_names(self):
-        names = {a.name for a in root_agent.sub_agents}
-        assert "IngestionAgent" in names
-        assert "ValidationAgent" in names
-        assert "ProcessingAgent" in names
+    def test_has_seven_tools(self):
+        # 3 AgentTools + write_fix + batch_write_fixes + skip_row + skip_fixes
+        assert len(root_agent.tools) == 7
 
-    def test_no_tools(self):
-        # Root agent delegates everything to sub-agents
-        tools = getattr(root_agent, "tools", None)
-        assert tools is None or len(tools) == 0
+    def test_has_agent_tools(self):
+        agent_tools = [t for t in root_agent.tools if isinstance(t, AgentTool)]
+        assert len(agent_tools) == 3
+
+    def test_agent_tool_names(self):
+        agent_tools = [t for t in root_agent.tools if isinstance(t, AgentTool)]
+        names = {t.agent.name for t in agent_tools}
+        assert "load_spreadsheet" in names
+        assert "validate_data" in names
+        assert "process_results" in names
+
+    def test_has_write_fix_tool(self):
+        non_agent_tools = [t for t in root_agent.tools if not isinstance(t, AgentTool)]
+        tool_names = {t.__name__ if callable(t) else t.name for t in non_agent_tools}
+        assert "write_fix" in tool_names
 
     def test_has_model(self):
         assert root_agent.model is not None

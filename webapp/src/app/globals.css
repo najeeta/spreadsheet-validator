@@ -3,6 +3,16 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  /* !important needed: CopilotKit's styles.css loads after globals.css
+     and its :root block would otherwise override these values. */
+  --copilot-kit-primary-color: #800020 !important;
+  --copilot-kit-contrast-color: #ffffff !important;
+  --copilot-kit-background-color: #ffffff !important;
+  --copilot-kit-secondary-color: #fdf2f4 !important;
+  --copilot-kit-secondary-contrast-color: #171717 !important;
+  --copilot-kit-separator-color: #e5e7eb !important;
+  --copilot-kit-muted-color: #9a1530 !important;
+  --copilot-kit-input-background-color: #ffffff !important;
 }
 
 @theme inline {
@@ -10,17 +20,99 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-burgundy-50: #fdf2f4;
+  --color-burgundy-100: #fce4e9;
+  --color-burgundy-200: #f9c9d3;
+  --color-burgundy-300: #f3a0b4;
+  --color-burgundy-400: #ea6d8a;
+  --color-burgundy-500: #d9405e;
+  --color-burgundy-600: #b8213d;
+  --color-burgundy-700: #9a1530;
+  --color-burgundy-800: #800020;
+  --color-burgundy-900: #6d0b1e;
+  --color-burgundy-950: #3d0410;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+/*
+ * Chat sidebar flex-height chain.
+ * CopilotKit DOM: .chat-sidebar > div (context wrapper) > .copilotKitChat > .copilotKitMessages + Input
+ * Every structural div needs flex-column + min-height:0 so the messages area scrolls
+ * and the input stays pinned at the bottom.
+ */
+
+/* Anonymous context-provider wrapper (direct child of sidebar) */
+.chat-sidebar > div {
+  display: flex !important;
+  flex-direction: column !important;
+  flex: 1 1 0% !important;
+  min-height: 0 !important;
+}
+
+/* CopilotKit chat root */
+.copilotKitChat {
+  display: flex !important;
+  flex-direction: column !important;
+  flex: 1 1 0% !important;
+  min-height: 0 !important;
+}
+
+/* Fallback: if CopilotKit's default Messages wrapper is used */
+.copilotKitMessages {
+  flex: 1 1 0% !important;
+  overflow-y: auto !important;
+  min-height: 0 !important;
+}
+
+/* User message bubble - burgundy background */
+.copilotKitMessage.copilotKitUserMessage {
+  background-color: #800020 !important;
+}
+
+/* ── Card & Row Animations ── */
+
+@keyframes cardFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes rowFadeOut {
+  0% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+  40% {
+    opacity: 0;
+    transform: translateX(16px) scale(0.98);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(16px) scale(0.95);
+    max-height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    margin-top: 0;
+    border-color: transparent;
+  }
+}
+
+.animate-card-in {
+  animation: cardFadeIn 0.35s ease-out both;
+}
+
+.animate-row-out {
+  animation: rowFadeOut 0.55s ease-in-out forwards;
+  overflow: hidden;
+  pointer-events: none;
 }

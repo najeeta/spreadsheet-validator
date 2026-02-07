@@ -1,83 +1,34 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
-import { IngestionSummaryCard } from "@/components/a2ui/IngestionSummaryCard";
-import { ValidationResultsCard } from "@/components/a2ui/ValidationResultsCard";
+
+// Mock CopilotKit modules that transitively import katex CSS
+vi.mock("@copilotkit/react-core", () => ({
+  useCopilotChat: () => ({ appendMessage: vi.fn().mockResolvedValue(undefined) }),
+}));
+vi.mock("@copilotkit/runtime-client-gql", () => ({
+  TextMessage: class {
+    content: string;
+    role: string;
+    constructor({ content, role }: { content: string; role: string }) {
+      this.content = content;
+      this.role = role;
+    }
+  },
+  Role: { User: "user" },
+}));
+
+// Mock ValidatorContext used by CompletionCard
+vi.mock("@/contexts/ValidatorContext", () => ({
+  useValidator: () => ({
+    threadId: "test-thread",
+    setThreadId: vi.fn(),
+    triggerUpload: vi.fn(),
+    setAgentState: vi.fn(),
+  }),
+}));
+
 import { ProgressCard } from "@/components/a2ui/ProgressCard";
 import { CompletionCard } from "@/components/a2ui/CompletionCard";
-
-describe("IngestionSummaryCard", () => {
-  it("renders file name", () => {
-    render(
-      <IngestionSummaryCard
-        fileName="test.csv"
-        rowCount={100}
-        columnCount={7}
-        columns={["employee_id", "dept", "amount"]}
-      />
-    );
-    expect(screen.getByText(/test\.csv/)).toBeInTheDocument();
-  });
-
-  it("renders row count", () => {
-    render(
-      <IngestionSummaryCard
-        fileName="test.csv"
-        rowCount={100}
-        columnCount={7}
-        columns={["a", "b"]}
-      />
-    );
-    expect(screen.getByText(/100/)).toBeInTheDocument();
-  });
-
-  it("renders column names", () => {
-    render(
-      <IngestionSummaryCard
-        fileName="test.csv"
-        rowCount={10}
-        columnCount={2}
-        columns={["employee_id", "dept"]}
-      />
-    );
-    expect(screen.getByText(/employee_id/)).toBeInTheDocument();
-  });
-});
-
-describe("ValidationResultsCard", () => {
-  it("renders total rows", () => {
-    render(
-      <ValidationResultsCard totalRows={100} validCount={90} errorCount={10} />
-    );
-    expect(screen.getByText(/100/)).toBeInTheDocument();
-  });
-
-  it("renders valid count", () => {
-    render(
-      <ValidationResultsCard totalRows={100} validCount={90} errorCount={10} />
-    );
-    expect(screen.getByText(/90/)).toBeInTheDocument();
-  });
-
-  it("renders error count", () => {
-    render(
-      <ValidationResultsCard totalRows={100} validCount={90} errorCount={10} />
-    );
-    expect(screen.getByText("10")).toBeInTheDocument();
-  });
-
-  it("renders progress bar", () => {
-    const { container } = render(
-      <ValidationResultsCard totalRows={100} validCount={90} errorCount={10} />
-    );
-    // The progress bar should have a width style
-    const progressBar =
-      container.querySelector("[data-testid='progress-bar']") ||
-      container.querySelector(".bg-green-500, .bg-emerald-500");
-    // At minimum, the component renders without error; progressBar may or may not exist
-    void progressBar;
-    expect(container.innerHTML).toContain("90");
-  });
-});
 
 describe("ProgressCard", () => {
   it("renders phase name", () => {
@@ -121,7 +72,7 @@ describe("CompletionCard", () => {
       />
     );
     expect(screen.getByText(/success\.xlsx/)).toBeInTheDocument();
-    expect(screen.getByText(/errors\.xlsx/)).toBeInTheDocument();
+    expect(screen.getAllByText(/errors\.xlsx/).length).toBeGreaterThanOrEqual(1);
   });
 
   it("renders success indicator", () => {

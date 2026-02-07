@@ -25,31 +25,53 @@ describe("useA2UIStateRender hook", () => {
     expect(source).toContain("spreadsheet_validator");
   });
 
-  it("renders CompletionCard for COMPLETED status", () => {
+  it("render function returns null (cards moved to StateCanvas)", () => {
     const source = fs.readFileSync(hookPath, "utf8");
+    expect(source).toContain("return null");
+  });
+});
+
+describe("stateToCard shared logic", () => {
+  const stateToCardPath = path.resolve(
+    __dirname,
+    "../lib/stateToCard.tsx"
+  );
+
+  it("stateToCard file exists", () => {
+    expect(fs.existsSync(stateToCardPath)).toBe(true);
+  });
+
+  it("imports all card components", () => {
+    const source = fs.readFileSync(stateToCardPath, "utf8");
     expect(source).toContain("CompletionCard");
+    expect(source).toContain("ProgressCard");
+    expect(source).toContain("FixesTable");
+    expect(source).toContain("UploadCard");
+  });
+
+  it("renders CompletionCard for COMPLETED status", () => {
+    const source = fs.readFileSync(stateToCardPath, "utf8");
     expect(source).toContain("COMPLETED");
   });
 
-  it("renders IngestionSummaryCard for RUNNING status", () => {
-    const source = fs.readFileSync(hookPath, "utf8");
-    expect(source).toContain("IngestionSummaryCard");
+  it("returns null for RUNNING status (top bar shows metrics)", () => {
+    const source = fs.readFileSync(stateToCardPath, "utf8");
+    expect(source).toContain("RUNNING");
   });
 
-  it("renders ValidationResultsCard for VALIDATING status", () => {
-    const source = fs.readFileSync(hookPath, "utf8");
-    expect(source).toContain("ValidationResultsCard");
+  it("returns null for VALIDATING status (top bar shows metrics)", () => {
+    const source = fs.readFileSync(stateToCardPath, "utf8");
+    expect(source).toContain("VALIDATING");
   });
 
   it("renders ProgressCard for TRANSFORMING/PACKAGING", () => {
-    const source = fs.readFileSync(hookPath, "utf8");
+    const source = fs.readFileSync(stateToCardPath, "utf8");
     expect(source).toContain("ProgressCard");
     expect(source).toContain("TRANSFORMING");
   });
 
   it("derives counts from array lengths not hardcoded values", () => {
-    const source = fs.readFileSync(hookPath, "utf8");
-    // Should use .length to compute counts
+    const source = fs.readFileSync(stateToCardPath, "utf8");
     expect(source).toContain(".length");
   });
 });
